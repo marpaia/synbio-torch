@@ -7,7 +7,7 @@ at the start of each run.
 
 ```python
 from sboltorch import RunConfig
-config = RunConfig.from_yaml("configs/train_graph.yaml")
+config = RunConfig.from_yaml("examples/configs/train_graph.yaml")
 ```
 
 ## Top level

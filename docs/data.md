@@ -77,7 +77,7 @@ over the same data returns the cached shard — a training run is reproducible a
 offline, decoupled from a live database.
 
 ```bash
-sboltorch ingest configs/train_graph.yaml   # materialize without training
+sboltorch ingest examples/configs/train_graph.yaml   # materialize without training
 ```
 
 ## Test fixtures

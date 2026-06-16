@@ -39,10 +39,10 @@ A run is fully specified by one YAML config. From the command line:
 
 ```bash
 # Materialize a corpus to the local Parquet cache (offline, reproducible).
-sboltorch ingest configs/finetune_expression.yaml
+sboltorch ingest examples/configs/finetune_expression.yaml
 
 # Train. Resolved config, per-epoch metrics.jsonl, and best.pt land in output_dir.
-sboltorch train configs/finetune_expression.yaml
+sboltorch train examples/configs/finetune_expression.yaml
 ```
 
 Or from Python:
@@ -50,7 +50,7 @@ Or from Python:
 ```python
 import sboltorch as st
 
-config = st.RunConfig.from_yaml("configs/train_graph.yaml")
+config = st.RunConfig.from_yaml("examples/configs/train_graph.yaml")
 metrics = st.run_training(config)
 ```
 
@@ -58,10 +58,10 @@ metrics = st.run_training(config)
 
 | Config | What it does |
 |--------|--------------|
-| [`finetune_expression.yaml`](configs/finetune_expression.yaml) | Frozen DNABERT-2 backbone → regression head. |
-| [`pretrain_mlm.yaml`](configs/pretrain_mlm.yaml) | From-scratch masked-LM pretraining; writes a reusable backbone. |
-| [`finetune_structure_aware.yaml`](configs/finetune_structure_aware.yaml) | Sequence + feature-boundary markers. |
-| [`train_graph.yaml`](configs/train_graph.yaml) | Graph transformer over the composition graph. |
+| [`finetune_expression.yaml`](examples/configs/finetune_expression.yaml) | Frozen DNABERT-2 backbone → regression head. |
+| [`pretrain_mlm.yaml`](examples/configs/pretrain_mlm.yaml) | From-scratch masked-LM pretraining; writes a reusable backbone. |
+| [`finetune_structure_aware.yaml`](examples/configs/finetune_structure_aware.yaml) | Sequence + feature-boundary markers. |
+| [`train_graph.yaml`](examples/configs/train_graph.yaml) | Graph transformer over the composition graph. |
 
 ## Documentation
 

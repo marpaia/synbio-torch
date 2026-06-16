@@ -8,9 +8,9 @@ Each axis is a configuration choice, not a separate code path.
 
 | Modality | Consumes | Model | Config |
 |----------|----------|-------|--------|
-| `sequence` | raw sequence elements | pretrained or from-scratch encoder + pooling + head | [finetune_expression.yaml](../configs/finetune_expression.yaml) |
-| `structure_aware` | sequence + feature boundaries (role, orientation) | same, over an extended vocabulary | [finetune_structure_aware.yaml](../configs/finetune_structure_aware.yaml) |
-| `graph` | the SBOL composition graph | PyG graph transformer (`TransformerConv`) | [train_graph.yaml](../configs/train_graph.yaml) |
+| `sequence` | raw sequence elements | pretrained or from-scratch encoder + pooling + head | [finetune_expression.yaml](../examples/configs/finetune_expression.yaml) |
+| `structure_aware` | sequence + feature boundaries (role, orientation) | same, over an extended vocabulary | [finetune_structure_aware.yaml](../examples/configs/finetune_structure_aware.yaml) |
+| `graph` | the SBOL composition graph | PyG graph transformer (`TransformerConv`) | [train_graph.yaml](../examples/configs/train_graph.yaml) |
 
 - **Sequence** tokenizes the object's elements directly.
 - **Structure-aware** wraps each annotated feature span with role-keyed boundary
