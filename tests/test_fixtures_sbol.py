@@ -47,3 +47,25 @@ def test_abstract_design_has_no_sequences():
     # the parser returns no sequences rather than failing.
     objs = list(LocalFileCorpus(FIXTURES / "sbol3" / "toggle_switch.ttl", fmt="sbol"))
     assert all(o.sequence is None or not o.sequence.elements for o in objs)
+
+
+def test_sbol3_components_carry_features_and_graph():
+    # SBOL3 documents yield one record per Component, with features and a
+    # composition graph the structure-aware and graph encoders consume.
+    objs = list(LocalFileCorpus(FIXTURES / "sbol3" / "BBa_F2620_PoPSReceiver.ttl", fmt="sbol"))
+    comps = [o for o in objs if o.sbol_class.endswith("Component")]
+    assert comps and len(comps) == len(objs)
+    featured = [o for o in comps if o.features]
+    assert featured, "expected at least one Component with annotated features"
+    feat = featured[0].features[0]
+    assert feat.roles or feat.instance_of  # a feature names a role and/or an instance
+    assert featured[0].neighbors is not None and featured[0].neighbors.nodes
+
+
+def test_abstract_design_components_have_subcomponent_graph():
+    # An abstract design has no sequence but still yields a useful composition
+    # graph: SubComponents wired by instanceOf into the graph slice.
+    objs = list(LocalFileCorpus(FIXTURES / "sbol3" / "toggle_switch.ttl", fmt="sbol"))
+    edges = {e.predicate for o in objs if o.neighbors for e in o.neighbors.edges}
+    assert any(p.endswith("hasFeature") for p in edges)
+    assert any(p.endswith("instanceOf") for p in edges)

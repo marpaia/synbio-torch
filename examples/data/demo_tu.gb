@@ -1,0 +1,20 @@
+LOCUS       demo_tu               120 bp    DNA     linear   SYN 18-JUN-2026
+DEFINITION  Synthetic demo transcriptional unit for sbol-torch examples.
+ACCESSION   demo_tu
+VERSION     demo_tu
+KEYWORDS    .
+SOURCE      synthetic construct
+  ORGANISM  synthetic construct
+FEATURES             Location/Qualifiers
+     promoter        1..35
+                     /label="J23100"
+     RBS             36..55
+                     /label="B0034"
+     CDS             56..105
+                     /label="GFP"
+     terminator      106..120
+                     /label="B0015"
+ORIGIN
+        1 tggttaagtt tggattagct cctttatcat tgcgcattgc gttgaggtct ccactacgaa
+       61 tacctagtaa tcgaggcgtt tatcaaacct aggtcttcag gctccgcgtg gcaatctaga
+//

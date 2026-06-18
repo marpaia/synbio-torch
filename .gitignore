@@ -15,6 +15,9 @@ runs/
 *.parquet
 wandb/
 
+# Normalized SBOL3 produced by examples/normalize_and_ingest.py
+examples/data/normalized/
+
 # Environment
 .env
 .env.*

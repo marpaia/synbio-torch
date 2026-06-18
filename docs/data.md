@@ -41,13 +41,48 @@ predicate local-name, so the client is robust to IRI compaction.
 
 - **FASTA** (`.fa`/`.fasta`/`.fna`) — one record per sequence; labels parsed from
   `key=value` tokens in the header when `label_key` is set.
-- **SBOL RDF** (`.ttl`/`.rdf`/`.xml`/`.nt`) — parsed with rdflib; yields one
-  record per `sbol:Sequence` subject (SBOL2 and SBOL3 element predicates).
+- **SBOL RDF** (`.ttl`/`.rdf`/`.xml`/`.nt`) — parsed with rdflib. When the
+  document has SBOL3 `Component` top-levels, one record is yielded per Component,
+  carrying its `sequence` (`hasSequence`), `roles`/`types`, annotated `features`
+  (`hasFeature` → SubComponent / SequenceFeature, with roles and `Range`
+  locations), and the composition `GraphSlice`. So real SBOL3 designs feed the
+  `structure_aware` and `graph` modalities, not just `sequence`. Documents
+  without Components — bare `sbol:Sequence` subjects, including SBOL2
+  `ComponentDefinition` sequences — yield one sequence-only record each.
 
 ```
 >partA measure=12.5
 ACGTACGT...
 ```
+
+### Normalizing other formats to SBOL3
+
+GenBank and SBOL2 inputs reach the SBOL3 path through the [`sbol`](https://github.com/marpaia/sbol-rs)
+CLI, run as an offline preprocessing step. Install it with Cargo:
+
+```bash
+cargo install sbol-cli
+```
+
+`scripts/normalize_sbol.sh` then converts a directory of mixed inputs into SBOL3
+Turtle:
+
+```bash
+NAMESPACE=https://example.org/mydesigns scripts/normalize_sbol.sh raw/ normalized/
+# then point a local corpus at normalized/ with fmt: sbol
+```
+
+The `sbol` binary is located via the `SBOL_BIN` environment variable, then an
+`SBOL_BIN=` line in the repo-root `.env`, then `sbol` on `PATH` (where
+`cargo install` puts it). `examples/normalize_and_ingest.py` runs this end to end
+against a bundled GenBank demo.
+
+GenBank (`.gb`/`.gbk`) is imported, SBOL2 RDF is upgraded, and existing SBOL3 is
+re-serialized to Turtle. `NAMESPACE` roots the resulting top-levels and is
+required for GenBank (which carries no namespace). **FASTA is excluded** — the
+importer writes a header's `key=value` into `sbol:description` rather than a
+numeric predicate, so labels would not survive; feed labeled FASTA directly with
+`fmt: fasta`, whose header parsing reads `measure=...` correctly.
 
 ## Synthetic (`source: synthetic`)
 

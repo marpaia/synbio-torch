@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sboltorch.data.synthetic import SyntheticCorpus, generate_components, write_sbol_turtle
+from sboltorch.types import local_name
 
 
 def test_generation_is_deterministic():
@@ -62,9 +63,22 @@ def test_sbol_turtle_roundtrips_through_local_corpus(tmp_path):
 
     comps = generate_components(5, seed=7)
     path = write_sbol_turtle(comps, tmp_path / "synthetic.ttl")
-    # The current SBOL parser extracts Sequence subjects; every component's
-    # sequence should round-trip.
+    # One record per Component, with sequence, features, and composition graph.
     parsed = list(LocalFileCorpus(path, fmt="sbol"))
+    assert len(parsed) == len(comps)
+
     elements = {o.sequence.elements for o in parsed if o.sequence}
     expected = {c.sequence.elements for c in comps}
     assert expected <= elements
+
+    by_iri = {o.iri: o for o in parsed}
+    for original in comps:
+        got = by_iri[original.iri]
+        # Each component round-trips its four annotated features with roles and ranges.
+        assert len(got.features) == len(original.features) == 4
+        assert {r for f in got.features for r in f.roles} == {r for f in original.features for r in f.roles}
+        assert all(f.locations and f.locations[0].start is not None for f in got.features)
+        assert {f.instance_of for f in got.features} == {f.instance_of for f in original.features}
+        # The composition graph carries the hasFeature / instanceOf / hasSequence edges.
+        predicates = {local_name(e.predicate) for e in got.neighbors.edges}
+        assert {"hasFeature", "instanceOf", "hasSequence"} <= predicates

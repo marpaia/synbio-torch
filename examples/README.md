@@ -25,10 +25,36 @@ sboltorch train examples/configs/<name>.yaml
 | [`finetune_structure_aware.yaml`](configs/finetune_structure_aware.yaml) | Structure-aware regression (from scratch) | synthetic | `WANDB_API_KEY` (or set `wandb.enabled: false`) |
 | [`pretrain_mlm.yaml`](configs/pretrain_mlm.yaml) | From-scratch MLM pretraining | sbol-db | a running sbol-db at `base_url` |
 | [`finetune_expression.yaml`](configs/finetune_expression.yaml) | Frozen DNABERT-2 → regression | sbol-db | a running sbol-db, plus DNABERT-2 (Linux/GPU — see [backbones](../docs/backbones.md)) |
+| [`ingest_local_sbol.yaml`](configs/ingest_local_sbol.yaml) | Structure-aware on normalized SBOL3 | local files | the [`sbol`](https://github.com/marpaia/sbol-rs) CLI (`SBOL_BIN`) |
 
 The two `synthetic`-source configs are the quickest way to see the full pipeline
 end to end. To point a config at your own data, change the `corpus` section (see
 [configuration](../docs/configuration.md) and [data sources](../docs/data.md)).
+
+## Normalizing other formats to SBOL3
+
+`normalize_and_ingest.py` bridges a GenBank file into a materialized,
+structure-aware corpus: it converts [`data/demo_tu.gb`](data/demo_tu.gb) to SBOL3
+with the [`sbol`](https://github.com/marpaia/sbol-rs) CLI, then parses the
+sequence, features, and composition graph back out. Install the CLI with Cargo:
+
+```bash
+cargo install sbol-cli
+```
+
+```bash
+python examples/normalize_and_ingest.py
+```
+
+The `sbol` binary is located via the `SBOL_BIN` environment variable or an
+`SBOL_BIN=` line in the repo-root `.env` (the same file that holds
+`WANDB_API_KEY`); `cargo install` puts it on `PATH`. The conversion writes
+`data/normalized/`, which
+[`ingest_local_sbol.yaml`](configs/ingest_local_sbol.yaml) then reads:
+
+```bash
+sboltorch train examples/configs/ingest_local_sbol.yaml
+```
 
 ## Weights & Biases
 
