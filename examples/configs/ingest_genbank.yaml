@@ -1,0 +1,15 @@
+# Import a GenBank file to the Parquet cache via the native sbol-rs binding:
+#
+#   synbiotorch ingest examples/configs/ingest_genbank.yaml
+#
+# The bundled demo is a single transcriptional unit; point corpus.path at a
+# directory of .gb/.gbk files to materialize a real corpus. namespace roots the
+# resulting identities (GenBank carries none).
+seed: 0
+output_dir: runs/ingest_genbank
+
+corpus:
+  source: genbank
+  path: examples/data/demo_tu.gb
+  namespace: https://example.org/demo
+  cache_dir: .synbiotorch_cache

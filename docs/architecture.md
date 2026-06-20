@@ -1,21 +1,22 @@
 # Architecture
 
-sbol-torch turns SBOL designs into trained transformer models. Three ideas shape
-it: every source normalizes to one record type, the parts that vary plug in
-behind protocols, and the training engine stays small and explicit.
+synbio-torch turns biological designs and sequences into trained transformer
+models. Three ideas shape it: every source normalizes to one record type, the
+parts that vary plug in behind protocols, and the training engine stays small and
+explicit.
 
 ## One record type
 
-Every data source — the sbol-db REST API, local SBOL/FASTA files, or the synthetic
-generator — is normalized into `SbolObject` (`sboltorch.types`):
+Every data source — FASTA, CSV/TSV tables, GenBank, SBOL, the sbol-db REST API, or
+the synthetic generator — is normalized into `Design` (`synbiotorch.types`):
 
 ```
-SbolObject(iri, sbol_class, roles, types, sequence, features, neighbors, label, raw)
+Design(iri, record_class, roles, types, sequence, features, neighbors, label, raw)
 ```
 
-Training code consumes only `SbolObject`s and never branches on provenance. A
+Training code consumes only `Design`s and never branches on provenance. A
 source is anything satisfying the `Corpus` protocol (`__iter__` yielding
-`SbolObject`s, plus a `fingerprint()` for caching).
+`Design`s, plus a `fingerprint()` for caching).
 
 ## Swappable plug points
 
@@ -23,7 +24,7 @@ Three independent axes are each a `Protocol` with interchangeable implementation
 selected by configuration:
 
 - **Tokenizer** — how a sequence becomes tokens (`hf`, `kmer`, `char`).
-- **Encoder** — the input modality, turning an `SbolObject` into model input
+- **Encoder** — the input modality, turning an `Design` into model input
   (`sequence`, `structure_aware`, `graph`).
 - **Task** — the training objective, owning loss and metrics (`supervised`,
   `frozen`, `mlm`, `causal`).
@@ -33,7 +34,7 @@ extends a capability without touching the engine. See [extending.md](extending.m
 
 ## The training engine
 
-The training loop (`sboltorch.engine`) is plain PyTorch: AMP (`fp16`/`bf16`),
+The training loop (`synbiotorch.engine`) is plain PyTorch: AMP (`fp16`/`bf16`),
 gradient accumulation and clipping, a linear warmup/decay schedule, optional
 gradient checkpointing and `torch.compile`, and a list of callbacks
 (`EarlyStopping`, `ModelCheckpoint`, `PeriodicCheckpoint`, `MetricLogger`,
@@ -49,7 +50,7 @@ A `RunConfig` drives the whole pipeline. The configured `Corpus` source is
 materialized to sharded Parquet and split into train/val/test. The default path
 loads it into memory and splits by index; the streaming path iterates the shards
 lazily and assigns each record to a partition by a hash split, optionally packing
-tokens into fixed-length blocks. The `Encoder` turns each `SbolObject` into model
+tokens into fixed-length blocks. The `Encoder` turns each `Design` into model
 input for its modality, using the `Tokenizer`, and a `DataLoader` batches the
 result through a collator (padding, MLM masking, or causal next-token shift). The
 `Trainer` then runs the loop under the `Task` and `BatchAdapter`, writing
@@ -59,24 +60,25 @@ checkpoints and metrics.
 
 | Layer | Module | Responsibility |
 |-------|--------|----------------|
-| Config | `sboltorch.config` | One Pydantic `RunConfig` per run; validated, serialized. |
-| Data | `sboltorch.data` | Corpus sources (`SbolDbClient`, `LocalFileCorpus`, synthetic) and sharded Parquet materialization. |
-| Tokenize | `sboltorch.tokenize` | `hf` / `kmer` / `char` behind one protocol (encode + decode). |
-| Encoders | `sboltorch.encoders` | Turn an `SbolObject` into model input, per modality. |
-| Datasets | `sboltorch.datasets` | Map-style and streaming `Dataset`s, token packing, padding / MLM / causal collators, seeded and hash splits. |
-| Models | `sboltorch.models` | Backbone (pretrained or from-scratch) + pooling + head; MLM, causal, and graph models. |
-| Tasks | `sboltorch.tasks` | Loss, metrics, label dtype, target transform. |
-| Engine | `sboltorch.engine` | Training loop, callbacks, batch adapters. |
-| Distributed | `sboltorch.distributed` | Process-group setup, rank-aware data/IO, metric reduction (DDP). |
-| Generate | `sboltorch.generate` | Autoregressive sampling and design completion from a causal backbone. |
-| Pipeline | `sboltorch.pipeline` | Wires the layers from a `RunConfig`. |
+| Config | `synbiotorch.config` | One Pydantic `RunConfig` per run; validated, serialized. |
+| Sources | `synbiotorch.sources` | Corpus sources (FASTA, table, GenBank, SBOL, sbol-db, synthetic), each normalizing to `Design`. |
+| Data | `synbiotorch.data` | The `Corpus` protocol, `build_corpus`, and sharded Parquet materialization. |
+| Tokenize | `synbiotorch.tokenize` | `hf` / `kmer` / `char` behind one protocol (encode + decode). |
+| Encoders | `synbiotorch.encoders` | Turn a `Design` into model input, per modality. |
+| Datasets | `synbiotorch.datasets` | Map-style and streaming `Dataset`s, token packing, padding / MLM / causal collators, seeded and hash splits. |
+| Models | `synbiotorch.models` | Backbone (pretrained or from-scratch) + pooling + head; MLM, causal, and graph models. |
+| Tasks | `synbiotorch.tasks` | Loss, metrics, label dtype, target transform. |
+| Engine | `synbiotorch.engine` | Training loop, callbacks, batch adapters. |
+| Distributed | `synbiotorch.distributed` | Process-group setup, rank-aware data/IO, metric reduction (DDP). |
+| Generate | `synbiotorch.generate` | Autoregressive sampling and design completion from a causal backbone. |
+| Pipeline | `synbiotorch.pipeline` | Wires the layers from a `RunConfig`. |
 
 ## Key protocols
 
-- `Corpus`: `__iter__() -> Iterator[SbolObject]`, `fingerprint() -> str`.
+- `Corpus`: `__iter__() -> Iterator[Design]`, `fingerprint() -> str`.
 - `Tokenizer`: `encode`, `tokenize_content`, `vocab_size`, `pad_token_id`,
   `mask_token_id`, `special_token_ids`, `max_length`.
-- `Encoder`: `encode(SbolObject) -> ModelInput`, `output_spec -> EncoderSpec`.
+- `Encoder`: `encode(Design) -> ModelInput`, `output_spec -> EncoderSpec`.
 - `Task`: `loss`, `predict`, `epoch_metrics`, `primary_metric`, `label_dtype`.
 - `BatchAdapter`: `to_device`, `forward(model, batch)`, `labels(batch)`.
 - `Callback`: `on_train_start`, `on_epoch_end`, `on_train_end`.

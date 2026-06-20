@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from sboltorch.data.synthetic import SyntheticCorpus, generate_components, write_sbol_turtle
-from sboltorch.types import local_name
+from synbiotorch.sources.synthetic import SyntheticCorpus, generate_components, write_sbol_turtle
+from synbiotorch.types import local_name
 
 
 def test_generation_is_deterministic():
@@ -59,12 +59,12 @@ def test_synthetic_corpus_is_iterable_and_fingerprinted():
 
 
 def test_sbol_turtle_roundtrips_through_local_corpus(tmp_path):
-    from sboltorch.data.local import LocalFileCorpus
+    from synbiotorch.sources.sbol import SbolFileCorpus
 
     comps = generate_components(5, seed=7)
     path = write_sbol_turtle(comps, tmp_path / "synthetic.ttl")
     # One record per Component, with sequence, features, and composition graph.
-    parsed = list(LocalFileCorpus(path, fmt="sbol"))
+    parsed = list(SbolFileCorpus(path))
     assert len(parsed) == len(comps)
 
     elements = {o.sequence.elements for o in parsed if o.sequence}

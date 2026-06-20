@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from sboltorch.tokenize.char import CharTokenizer
-from sboltorch.tokenize.kmer import KmerTokenizer
+from synbiotorch.tokenize.char import CharTokenizer
+from synbiotorch.tokenize.kmer import KmerTokenizer
 
 
 def test_kmer_vocab_size():
@@ -45,3 +45,13 @@ def test_special_token_ids_cover_reserved_tokens():
         assert tok.pad_token_id in tok.special_token_ids
         assert tok.mask_token_id in tok.special_token_ids
         assert len(tok.special_token_ids) == 5
+
+
+def test_char_protein_alphabet():
+    tok = CharTokenizer(alphabet="protein")
+    # 5 special tokens + 25 amino-acid/ambiguity codes.
+    assert tok.vocab_size == 5 + 25
+    enc = tok.encode("MKWVTFISLLFLFSSAYS")  # all standard residues
+    assert tok._unk not in enc.input_ids
+    # A DNA-only char tokenizer would have a smaller, different vocabulary.
+    assert tok.vocab_size != CharTokenizer(alphabet="dna").vocab_size

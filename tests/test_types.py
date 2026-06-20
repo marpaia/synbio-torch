@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from sboltorch.types import Alphabet, SbolObject, local_name
+from synbiotorch.sources.sbol import design_from_record
+from synbiotorch.types import Alphabet, local_name
 
 
 def test_local_name_handles_iri_and_curie():
@@ -16,7 +17,7 @@ def test_alphabet_inference():
 
 
 def test_from_record_extracts_sequence_by_local_name(object_records):
-    obj = SbolObject.from_record(object_records[0])
+    obj = design_from_record(object_records[0])
     assert obj.iri == "https://example.org/seqA"
     assert obj.sequence is not None
     assert obj.sequence.elements == "ACGTACGTACGT"
@@ -25,5 +26,5 @@ def test_from_record_extracts_sequence_by_local_name(object_records):
 
 def test_from_record_without_sequence_is_none():
     record = {"iri": "x", "sbol_class": "http://sbols.org/v3#Component", "data": {}}
-    obj = SbolObject.from_record(record)
+    obj = design_from_record(record)
     assert obj.sequence is None

@@ -6,14 +6,14 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from sboltorch.config import TrainConfig
-from sboltorch.datasets.dataset import Collator, EncodedDataset
-from sboltorch.encoders.sequence import SequenceEncoder
-from sboltorch.engine.callbacks import EarlyStopping, MetricLogger, ModelCheckpoint
-from sboltorch.engine.trainer import Trainer
-from sboltorch.tasks.supervised import SupervisedTask
-from sboltorch.tokenize.kmer import KmerTokenizer
-from sboltorch.types import Alphabet, SbolObject, SbolSequence
+from synbiotorch.config import TrainConfig
+from synbiotorch.datasets.dataset import Collator, EncodedDataset
+from synbiotorch.encoders.sequence import SequenceEncoder
+from synbiotorch.engine.callbacks import EarlyStopping, MetricLogger, ModelCheckpoint
+from synbiotorch.engine.trainer import Trainer
+from synbiotorch.tasks.supervised import SupervisedTask
+from synbiotorch.tokenize.kmer import KmerTokenizer
+from synbiotorch.types import Alphabet, Design, Sequence
 
 
 class TinyModel(nn.Module):
@@ -37,10 +37,10 @@ def _objects(n: int = 40):
         # Label correlates with GC content so the model has something to learn.
         seq = ("GC" * 10) if i % 2 == 0 else ("AT" * 10)
         objs.append(
-            SbolObject(
+            Design(
                 iri=f"s{i}",
-                sbol_class="http://sbols.org/v3#Sequence",
-                sequence=SbolSequence(elements=seq, alphabet=Alphabet.DNA),
+                record_class="http://sbols.org/v3#Sequence",
+                sequence=Sequence(elements=seq, alphabet=Alphabet.DNA),
                 label=1.0 if i % 2 == 0 else 0.0,
             )
         )
@@ -76,8 +76,8 @@ def test_training_loop_runs_and_logs(tmp_path):
 def test_collator_pads_to_longest():
     tokenizer = KmerTokenizer(k=3, max_length=64)
     encoder = SequenceEncoder(tokenizer)
-    short = SbolObject(iri="a", sbol_class="c", sequence=SbolSequence(elements="ACGTAC"))
-    long = SbolObject(iri="b", sbol_class="c", sequence=SbolSequence(elements="ACGTACGTACGTACGT"))
+    short = Design(iri="a", record_class="c", sequence=Sequence(elements="ACGTAC"))
+    long = Design(iri="b", record_class="c", sequence=Sequence(elements="ACGTACGTACGTACGT"))
     collator = Collator(tokenizer.pad_token_id, with_labels=False)
     batch = collator([encoder.encode(short), encoder.encode(long)])
     assert batch["input_ids"].shape[0] == 2
@@ -86,7 +86,7 @@ def test_collator_pads_to_longest():
 
 
 def test_tensor_batch_adapter_contract():
-    from sboltorch.engine.batch import TensorBatchAdapter
+    from synbiotorch.engine.batch import TensorBatchAdapter
 
     adapter = TensorBatchAdapter()
     captured = {}

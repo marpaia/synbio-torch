@@ -17,7 +17,7 @@ import pytest
 import torch
 from torch.utils.data import DataLoader
 
-from sboltorch.config import (
+from synbiotorch.config import (
     ArchConfig,
     CorpusConfig,
     EncoderConfig,
@@ -29,22 +29,22 @@ from sboltorch.config import (
     TokenizerConfig,
     TrainConfig,
 )
-from sboltorch.data.materialize import materialize
-from sboltorch.data.synthetic import SyntheticCorpus, generate_components
-from sboltorch.datasets.mlm_collator import MlmCollator
-from sboltorch.datasets.packing import PackedDataset
-from sboltorch.datasets.splits import split_of
-from sboltorch.datasets.streaming import StreamingEncodedDataset, iter_split_records
-from sboltorch.encoders.base import ModelInput
-from sboltorch.encoders.sequence import SequenceEncoder
-from sboltorch.engine.trainer import Callback, Trainer
-from sboltorch.exceptions import ConfigError
-from sboltorch.models import build_model
-from sboltorch.pipeline import run_training
-from sboltorch.reproducibility import set_seed
-from sboltorch.tasks.mlm import MlmTask
-from sboltorch.tokenize.kmer import KmerTokenizer
-from sboltorch.types import Alphabet, SbolObject, SbolSequence
+from synbiotorch.data.materialize import materialize
+from synbiotorch.datasets.mlm_collator import MlmCollator
+from synbiotorch.datasets.packing import PackedDataset
+from synbiotorch.datasets.splits import split_of
+from synbiotorch.datasets.streaming import StreamingEncodedDataset, iter_split_records
+from synbiotorch.encoders.base import ModelInput
+from synbiotorch.encoders.sequence import SequenceEncoder
+from synbiotorch.engine.trainer import Callback, Trainer
+from synbiotorch.exceptions import ConfigError
+from synbiotorch.models import build_model
+from synbiotorch.pipeline import run_training
+from synbiotorch.reproducibility import set_seed
+from synbiotorch.sources.synthetic import SyntheticCorpus, generate_components
+from synbiotorch.tasks.mlm import MlmTask
+from synbiotorch.tokenize.kmer import KmerTokenizer
+from synbiotorch.types import Alphabet, Design, Sequence
 
 CPU = torch.device("cpu")
 
@@ -57,12 +57,12 @@ class _MotifCorpus:
         self.n = n
         self._motifs = ["ACGT" * 30, "GGCC" * 30, "TTAA" * 30]
 
-    def __iter__(self) -> Iterator[SbolObject]:
+    def __iter__(self) -> Iterator[Design]:
         for i in range(self.n):
-            yield SbolObject(
+            yield Design(
                 iri=f"https://ex/m{i}",
-                sbol_class="http://sbols.org/v3#Sequence",
-                sequence=SbolSequence(elements=self._motifs[i % 3], alphabet=Alphabet.DNA),
+                record_class="http://sbols.org/v3#Sequence",
+                sequence=Sequence(elements=self._motifs[i % 3], alphabet=Alphabet.DNA),
             )
 
     def fingerprint(self) -> str:

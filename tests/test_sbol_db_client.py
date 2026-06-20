@@ -3,7 +3,7 @@ from __future__ import annotations
 import httpx
 import respx
 
-from sboltorch.data.sbol_db import SbolDbClient
+from synbiotorch.sources.sbol_db import SbolDbClient
 
 BASE = "http://sbol-db.test"
 
@@ -16,8 +16,8 @@ def test_list_objects_follows_keyset_cursor(object_records):
         httpx.Response(200, json={"objects": [object_records[0]], "next_cursor": "cur1"}),
         httpx.Response(200, json={"objects": [object_records[1]], "next_cursor": None}),
     ]
-    client = SbolDbClient(BASE, sbol_class="http://sbols.org/v3#Sequence")
-    records = list(client.list_objects(sbol_class="http://sbols.org/v3#Sequence"))
+    client = SbolDbClient(BASE, record_class="http://sbols.org/v3#Sequence")
+    records = list(client.list_objects(record_class="http://sbols.org/v3#Sequence"))
     assert [r["iri"] for r in records] == [object_records[0]["iri"], object_records[1]["iri"]]
     assert route.call_count == 2
 
@@ -54,7 +54,7 @@ def test_neighborhood_parses_graph_slice():
     client = SbolDbClient(BASE)
     slice_ = client.neighborhood("https://example.org/c1", depth=1)
     assert slice_.root_iri == "https://example.org/c1"
-    assert slice_.nodes[0].sbol_class == "Component"
+    assert slice_.nodes[0].record_class == "Component"
     assert slice_.edges[0].object == "https://example.org/s1"
 
 

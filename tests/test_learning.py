@@ -9,20 +9,20 @@ from __future__ import annotations
 import torch
 from torch.utils.data import DataLoader
 
-from sboltorch.config import ArchConfig, ModelConfig, TaskConfig, TrainConfig
-from sboltorch.data.synthetic import generate_components
-from sboltorch.datasets.dataset import Collator, EncodedDataset
-from sboltorch.datasets.mlm_collator import MlmCollator
-from sboltorch.encoders.sequence import SequenceEncoder
-from sboltorch.encoders.structure import StructureAwareEncoder
-from sboltorch.engine.callbacks import Callback
-from sboltorch.engine.trainer import Trainer
-from sboltorch.models import build_model
-from sboltorch.reproducibility import set_seed
-from sboltorch.tasks.mlm import MlmTask
-from sboltorch.tasks.supervised import SupervisedTask
-from sboltorch.tokenize.kmer import KmerTokenizer
-from sboltorch.types import Alphabet, SbolObject, SbolSequence
+from synbiotorch.config import ArchConfig, ModelConfig, TaskConfig, TrainConfig
+from synbiotorch.datasets.dataset import Collator, EncodedDataset
+from synbiotorch.datasets.mlm_collator import MlmCollator
+from synbiotorch.encoders.sequence import SequenceEncoder
+from synbiotorch.encoders.structure import StructureAwareEncoder
+from synbiotorch.engine.callbacks import Callback
+from synbiotorch.engine.trainer import Trainer
+from synbiotorch.models import build_model
+from synbiotorch.reproducibility import set_seed
+from synbiotorch.sources.synthetic import generate_components
+from synbiotorch.tasks.mlm import MlmTask
+from synbiotorch.tasks.supervised import SupervisedTask
+from synbiotorch.tokenize.kmer import KmerTokenizer
+from synbiotorch.types import Alphabet, Design, Sequence
 
 CPU = torch.device("cpu")
 
@@ -41,17 +41,17 @@ def _tiny_arch() -> ArchConfig:
     return ArchConfig(num_hidden_layers=2, num_attention_heads=4, intermediate_size=96, max_position_embeddings=256)
 
 
-def _gc_objects(n: int) -> list[SbolObject]:
+def _gc_objects(n: int) -> list[Design]:
     """GC-rich sequences -> label 1, AT-rich -> label 0 (a strong learnable signal)."""
     objs = []
     for i in range(n):
         gc = i % 2 == 0
         seq = ("GC" * 30) if gc else ("AT" * 30)
         objs.append(
-            SbolObject(
+            Design(
                 iri=f"s{i}",
-                sbol_class="http://sbols.org/v3#Sequence",
-                sequence=SbolSequence(elements=seq, alphabet=Alphabet.DNA),
+                record_class="http://sbols.org/v3#Sequence",
+                sequence=Sequence(elements=seq, alphabet=Alphabet.DNA),
                 label=1.0 if gc else 0.0,
             )
         )
@@ -98,7 +98,7 @@ def test_mlm_loss_decreases():
     # Periodic motifs make masked k-mers predictable from context -> loss must drop.
     motifs = ["ACGT" * 15, "GGCC" * 15, "TTAA" * 15]
     objs = [
-        SbolObject(iri=f"s{i}", sbol_class="c", sequence=SbolSequence(elements=motifs[i % 3], alphabet=Alphabet.DNA))
+        Design(iri=f"s{i}", record_class="c", sequence=Sequence(elements=motifs[i % 3], alphabet=Alphabet.DNA))
         for i in range(90)
     ]
     model = build_model(
@@ -137,9 +137,9 @@ def test_structure_aware_learns():
 def test_graph_learns():
     from torch_geometric.loader import DataLoader as GeoLoader
 
-    from sboltorch.encoders.graph import GraphEncoder
-    from sboltorch.engine.batch import GraphBatchAdapter
-    from sboltorch.models.graph import build_graph_model
+    from synbiotorch.encoders.graph import GraphEncoder
+    from synbiotorch.engine.batch import GraphBatchAdapter
+    from synbiotorch.models.graph import build_graph_model
 
     set_seed(0)
     enc = GraphEncoder()

@@ -11,6 +11,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The vendored PyO3 extension binds the sbol-rs crates (edition 2024),
+      # so building the package needs a recent Rust toolchain.
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -19,6 +24,7 @@ jobs:
       - name: Set up Python
         run: uv python install
 
+      # Builds the Rust extension via maturin as part of the editable install.
       - name: Sync dependencies
         run: uv sync --extra dev
 

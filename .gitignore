@@ -9,13 +9,20 @@ dist/
 .pytest_cache/
 .ruff_cache/
 
+# Compiled native extension (built by maturin) and Rust build artifacts.
+# rust/Cargo.lock IS committed, for reproducible builds.
+*.so
+*.pyd
+*.dylib
+rust/target/
+
 # Local materialized corpora and run outputs
-.sboltorch_cache/
+.synbiotorch_cache/
 runs/
 *.parquet
 wandb/
 
-# Normalized SBOL3 produced by examples/normalize_and_ingest.py
+# Locally normalized/converted data
 examples/data/normalized/
 
 # Environment

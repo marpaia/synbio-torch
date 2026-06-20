@@ -20,7 +20,7 @@ directly.
 
 ## transformers version
 
-sbol-torch pins `transformers` to the 4.x line. The 5.x line changes the ESM and
+synbio-torch pins `transformers` to the 4.x line. The 5.x line changes the ESM and
 custom modeling code that the pretrained DNA backbones rely on, so it is not
 compatible with them.
 

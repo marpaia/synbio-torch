@@ -7,10 +7,10 @@ output_dir: runs/finetune_expression
 corpus:
   source: sbol_db
   base_url: http://localhost:8080
-  sbol_class: http://sbols.org/v3#Sequence
+  record_class: http://sbols.org/v3#Sequence
   role: SO:0000167          # promoter; expand via /ontology/descendants if needed
   label_key: measure        # local-name of the predicate holding the numeric target
-  cache_dir: .sboltorch_cache
+  cache_dir: .synbiotorch_cache
 
 tokenizer:
   kind: hf

@@ -6,16 +6,16 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from sboltorch.config import ArchConfig, ModelConfig, TaskConfig, TrainConfig
-from sboltorch.datasets.dataset import EncodedDataset
-from sboltorch.datasets.mlm_collator import IGNORE_INDEX, MlmCollator
-from sboltorch.encoders.sequence import SequenceEncoder
-from sboltorch.engine.callbacks import MetricLogger
-from sboltorch.engine.trainer import Trainer
-from sboltorch.models import build_model
-from sboltorch.tasks.mlm import MlmTask
-from sboltorch.tokenize.kmer import KmerTokenizer
-from sboltorch.types import Alphabet, SbolObject, SbolSequence
+from synbiotorch.config import ArchConfig, ModelConfig, TaskConfig, TrainConfig
+from synbiotorch.datasets.dataset import EncodedDataset
+from synbiotorch.datasets.mlm_collator import IGNORE_INDEX, MlmCollator
+from synbiotorch.encoders.sequence import SequenceEncoder
+from synbiotorch.engine.callbacks import MetricLogger
+from synbiotorch.engine.trainer import Trainer
+from synbiotorch.models import build_model
+from synbiotorch.tasks.mlm import MlmTask
+from synbiotorch.tokenize.kmer import KmerTokenizer
+from synbiotorch.types import Alphabet, Design, Sequence
 
 
 def _objects(n: int = 32, length: int = 40):
@@ -24,10 +24,10 @@ def _objects(n: int = 32, length: int = 40):
     for i in range(n):
         seq = "".join(bases[(i + j) % 4] for j in range(length))
         out.append(
-            SbolObject(
+            Design(
                 iri=f"s{i}",
-                sbol_class="http://sbols.org/v3#Sequence",
-                sequence=SbolSequence(elements=seq, alphabet=Alphabet.DNA),
+                record_class="http://sbols.org/v3#Sequence",
+                sequence=Sequence(elements=seq, alphabet=Alphabet.DNA),
             )
         )
     return out
@@ -48,7 +48,7 @@ def test_masking_is_deterministic_with_seed():
 
 
 def test_special_tokens_are_never_masked():
-    from sboltorch.datasets.dataset import pad_token_batch
+    from synbiotorch.datasets.dataset import pad_token_batch
 
     tok = KmerTokenizer(k=3, max_length=64)
     batch = _batch(tok)

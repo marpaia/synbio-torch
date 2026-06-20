@@ -1,12 +1,12 @@
 # Configuration reference
 
 A run is fully specified by one YAML file validated into a `RunConfig`
-(`sboltorch.config`). Every field has a default, so configs only need to state
+(`synbiotorch.config`). Every field has a default, so configs only need to state
 what differs. The resolved config is written to `<output_dir>/config.resolved.yaml`
 at the start of each run.
 
 ```python
-from sboltorch import RunConfig
+from synbiotorch import RunConfig
 config = RunConfig.from_yaml("examples/configs/train_graph.yaml")
 ```
 
@@ -31,18 +31,22 @@ config = RunConfig.from_yaml("examples/configs/train_graph.yaml")
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
-| `source` | `sbol_db` \| `local` \| `synthetic` | `sbol_db` | Data source. |
+| `source` | `fasta` \| `sbol` \| `genbank` \| `table` \| `synthetic` \| `sbol_db` | `synthetic` | Data source. |
 | `base_url` | str | `null` | sbol-db base URL. **Required** when `source: sbol_db`. |
 | `username` / `password` | str | `null` | Optional basic auth for sbol-db. |
-| `sbol_class` | str | `null` | Filter to one SBOL class IRI (e.g. `http://sbols.org/v3#Sequence`). |
+| `record_class` | str | `null` | Filter to one SBOL class IRI (e.g. `http://sbols.org/v3#Sequence`). |
 | `role` | str | `null` | Filter to one role IRI (e.g. a Sequence Ontology term). |
 | `document_id` | str | `null` | Filter to one source document. |
-| `path` | str | `null` | File or directory. **Required** when `source: local`. |
-| `fmt` | `fasta` \| `sbol` \| `auto` | `auto` | Local file format; `auto` infers from extension. |
+| `path` | str | `null` | File or directory. **Required** for `fasta`/`sbol`/`genbank`/`table`. |
+| `namespace` | str | `null` | Roots identities for GenBank import and the SBOL2→3 upgrade. **Required** when `source: genbank`. |
+| `alphabet` | `auto` \| `dna` \| `rna` \| `protein` | `auto` | FASTA/table alphabet; `auto` detects from sequence content. |
+| `sequence_column` | str | `null` | Table column holding the sequence. **Required** when `source: table`. |
+| `label_column` | str | `null` | Table column holding the numeric label. |
+| `id_column` | str | `null` | Table column holding the record id (else `<file>:<row>`). |
 | `n` | int | `64` | Number of components when `source: synthetic`. |
 | `synthetic_seed` | int | `0` | Seed for the synthetic generator. |
-| `label_key` | str | `null` | Where the supervised label comes from: an sbol-db predicate local-name, or a FASTA header `key=value`. `null` means unlabeled (pretraining). For the synthetic source, any non-null value enables labels. |
-| `cache_dir` | str | `.sboltorch_cache` | Where the materialized Parquet corpus is stored. |
+| `label_key` | str | `null` | Where the supervised label comes from: an sbol-db predicate local-name, a FASTA header `key=value`, or an SBOL annotation predicate. `null` means unlabeled (pretraining). For the synthetic source, any non-null value enables labels. |
+| `cache_dir` | str | `.synbiotorch_cache` | Where the materialized Parquet corpus is stored. |
 | `shard_size` | int | `50000` | Rows per Parquet shard. Sharding keeps materializing and streaming memory-bounded for a corpus larger than RAM. |
 
 See [data.md](data.md) for the corpus sources in depth.
@@ -56,6 +60,7 @@ See [data.md](data.md) for the corpus sources in depth.
 | `stride` | int | `1` | k-mer stride (`kmer` only). |
 | `max_length` | int | `512` | Max tokens per sequence. |
 | `model_name` | str | `zhihan1996/DNABERT-2-117M` | Hub id for the `hf` tokenizer. |
+| `alphabet` | `dna` \| `protein` | `dna` | Character alphabet (`char` only): nucleotide or amino acids. |
 
 ## `encoder`
 
@@ -142,7 +147,7 @@ record — both reproducible across runs.
 | `early_stop` | object | `null` | Omit to disable. |
 
 Checkpoints (`best.pt`, `last.pt`) carry full optimizer/scheduler/scaler/RNG
-state. Resume a run with `sboltorch train <config> --resume <output_dir>/last.pt`;
+state. Resume a run with `synbiotorch train <config> --resume <output_dir>/last.pt`;
 it continues from the next epoch boundary after the checkpointed one, with the
 step counter and LR schedule intact.
 
@@ -156,7 +161,7 @@ step counter and LR schedule intact.
 Launch a distributed run with `torchrun`, which sets the rank/world environment:
 
 ```bash
-torchrun --nproc_per_node=<gpus> -m sboltorch.cli train <config>   # set train.distributed.strategy: ddp
+torchrun --nproc_per_node=<gpus> -m synbiotorch.cli train <config>   # set train.distributed.strategy: ddp
 ```
 
 Each rank reads a disjoint slice of the data (a `DistributedSampler` for in-memory

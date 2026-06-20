@@ -4,13 +4,48 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to
 follow semantic versioning.
 
+## [0.2.0] - 2026-06-20
+
+A rebrand to a general synthetic-biology ML library. **Breaking** throughout (the
+library has no released users): the distribution and import names change, the core
+record type is renamed, config keys change, and the external `sbol` CLI dependency
+is replaced by an in-process native extension.
+
+### Changed
+
+- **Renamed `sbol-torch` → `synbio-torch`** (import `synbiotorch`, was `sboltorch`;
+  CLI `synbiotorch`, was `sboltorch`; cache `.synbiotorch_cache`).
+- **Core record `SbolObject` → `Design`** (`SbolSequence` → `Sequence`, field
+  `sbol_class` → `record_class`). SBOL is now one source among many, not the
+  framing.
+- **Corpus sources moved to `synbiotorch.sources`**; `synbiotorch.data` keeps the
+  source-neutral `Corpus` protocol, `build_corpus`, and materialization. The
+  `local` source is replaced by explicit `fasta` / `sbol` / `genbank` sources.
+
+### Added
+
+- **Native sbol-rs parsing via PyO3.** GenBank import, SBOL 2→3 upgrade, and SBOL 3
+  reading are bound in-process from the [sbol-rs](https://github.com/marpaia/sbol-rs)
+  Rust crates (`synbiotorch._sbol`, built with maturin) — replacing the external
+  `sbol` CLI shell-out and the `rdflib` dependency.
+- **New data sources:** labeled CSV/TSV `table`, first-class `genbank`, and `sbol`
+  (2 & 3); FASTA gains alphabet auto-detection.
+- **Protein tokenization:** the `char` tokenizer takes `alphabet: dna | protein`.
+- New example configs: `finetune_protein.yaml`, `benchmark_dna_classification.yaml`,
+  `ingest_genbank.yaml`, with bundled CSV datasets.
+
+### Removed
+
+- The `rdflib` dependency, `scripts/normalize_sbol.sh`, and the `SBOL_BIN` CLI
+  lookup — SBOL/GenBank parsing is now native and in-process.
+
 ## [0.1.1] - 2026-06-20
 
 ### Added
 
 - **Causal-language-model pretraining and generation.** A `causal` objective
   (`task.kind: causal`) trains a decoder (`gpt2`, `gpt_neox`, `llama`, …) on
-  next-token prediction. `sboltorch generate` and `st.generate`/
+  next-token prediction. `synbiotorch generate` and `st.generate`/
   `st.generate_sequence` do autoregressive sampling (temperature / top-k / top-p)
   and design completion from a prefix. Tokenizers gained `decode`.
 - **Streaming, sharded data.** Corpora materialize to sharded Parquet and can be
@@ -24,7 +59,7 @@ follow semantic versioning.
   model and all-reduces gradients across ranks (launch with `torchrun`), with
   rank-aware data sharding, rank-0-only checkpoints/logs, and cross-rank metric
   reduction. Data-parallel only; no parameter sharding.
-- **Hardened training loop.** Resumable checkpoints (`sboltorch train --resume`)
+- **Hardened training loop.** Resumable checkpoints (`synbiotorch train --resume`)
   carrying optimizer/scheduler/scaler/RNG state; step-budgeted training
   (`max_steps`, `eval_every_n_steps`, `checkpoint_every_n_steps`); `bf16`/`fp16`
   precision; gradient checkpointing; `torch.compile`.

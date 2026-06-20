@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sboltorch.datasets.splits import make_split
+from synbiotorch.datasets.splits import make_split
 
 
 def test_split_is_deterministic():

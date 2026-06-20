@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from sboltorch.data.local import LocalFileCorpus
+from synbiotorch.sources.fasta import FastaCorpus
+from synbiotorch.sources.sbol import SbolFileCorpus
 
 
 def test_fasta_parsing_with_labels(fasta_file):
-    corpus = LocalFileCorpus(fasta_file, fmt="fasta", label_key="measure")
+    corpus = FastaCorpus(fasta_file, label_key="measure")
     objects = list(corpus)
     assert len(objects) == 3
     assert objects[0].display_id == "seq1"
@@ -14,13 +15,13 @@ def test_fasta_parsing_with_labels(fasta_file):
 
 
 def test_fasta_without_label_key_is_unlabeled(fasta_file):
-    corpus = LocalFileCorpus(fasta_file, fmt="fasta")
+    corpus = FastaCorpus(fasta_file)
     objects = list(corpus)
     assert all(o.label is None for o in objects)
 
 
 def test_sbol_parsing(sbol_file):
-    corpus = LocalFileCorpus(sbol_file, fmt="sbol", label_key="measure")
+    corpus = SbolFileCorpus(sbol_file, label_key="measure")
     objects = sorted(corpus, key=lambda o: o.iri)
     assert len(objects) == 2
     assert objects[0].sequence.elements.startswith("ttgacg")
@@ -28,6 +29,6 @@ def test_sbol_parsing(sbol_file):
 
 
 def test_fingerprint_is_stable(fasta_file):
-    a = LocalFileCorpus(fasta_file, fmt="fasta").fingerprint()
-    b = LocalFileCorpus(fasta_file, fmt="fasta").fingerprint()
+    a = FastaCorpus(fasta_file).fingerprint()
+    b = FastaCorpus(fasta_file).fingerprint()
     assert a == b

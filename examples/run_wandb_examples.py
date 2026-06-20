@@ -14,11 +14,11 @@ from pathlib import Path
 
 import wandb
 
-import sboltorch as st
+import synbiotorch as st
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONFIGS = ["train_graph", "finetune_structure_aware"]
-PROJECT = "sbol-torch-examples"
+PROJECT = "synbio-torch-examples"
 
 
 def load_env(path: Path) -> None:

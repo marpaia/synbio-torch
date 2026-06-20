@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import hashlib
 
-from sboltorch.data.materialize import materialize
-from sboltorch.types import Alphabet, SbolObject, SbolSequence
+from synbiotorch.data.materialize import materialize
+from synbiotorch.types import Alphabet, Design, Sequence
 
 
 class _FakeCorpus:
@@ -24,10 +24,10 @@ class _FakeCorpus:
 
 def _objects():
     return [
-        SbolObject(
+        Design(
             iri=f"https://example.org/s{i}",
-            sbol_class="http://sbols.org/v3#Sequence",
-            sequence=SbolSequence(elements="ACGT" * (i + 1), alphabet=Alphabet.DNA),
+            record_class="http://sbols.org/v3#Sequence",
+            sequence=Sequence(elements="ACGT" * (i + 1), alphabet=Alphabet.DNA),
             label=float(i),
         )
         for i in range(3)

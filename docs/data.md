@@ -1,106 +1,99 @@
 # Data sources
 
-Every source normalizes to `SbolObject` records, so training code never branches
-on where data came from. A source implements the `Corpus` protocol
-(`__iter__ -> Iterator[SbolObject]` and `fingerprint() -> str`).
+Every source normalizes to `Design` records, so training code never branches on
+where data came from. A source implements the `Corpus` protocol
+(`__iter__ -> Iterator[Design]` and `fingerprint() -> str`) and lives in
+`synbiotorch.sources`; the source-neutral pipeline (the `Corpus` protocol,
+`build_corpus`, and materialization) lives in `synbiotorch.data`.
 
 ```python
-from sboltorch import SbolObject  # iri, sbol_class, roles, types, sequence, features, neighbors, label, raw
+from synbiotorch import Design  # iri, record_class, roles, types, sequence, features, neighbors, label, raw
 ```
 
-## sbol-db (`source: sbol_db`)
+The active source is `corpus.source` in the run config.
 
-`SbolDbClient` (`sboltorch.data.sbol_db`) is a typed client over the sbol-db REST
-API. Iterating it streams objects matching the configured `sbol_class` / `role` /
-`document_id` filters, reading the supervised label from each object's JSON-LD
-slice when `label_key` is set.
+## FASTA (`source: fasta`)
 
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| `list_objects(...)` | `GET /objects/list` | Keyset-paginated stream of object records (up to 5000 per page). |
-| `get_object(iri)` | `GET /objects` | Resolve one object by IRI. |
-| `lookup_objects(iris)` | `POST /objects/lookup` | Resolve up to 1000 IRIs at once. |
-| `neighborhood(iri, depth, direction, predicates)` | `GET /objects/neighborhood` | Bounded graph traversal, returning a `GraphSlice`. |
-| `search_sequence(pattern, ...)` | `GET /sequences/search` | k-mer-indexed substring + reverse-complement search. |
-| `ontology_descendants(iri)` | `GET /ontology/descendants` | Transitive `is_a` expansion of a role/type term. |
-
-```python
-from sboltorch.data import SbolDbClient
-with SbolDbClient("http://localhost:8080", role="https://identifiers.org/SO:0000167",
-                  label_key="measure") as client:
-    for obj in client:
-        ...  # SbolObject with sequence + label
-```
-
-Sequence elements are extracted from the lossless JSON-LD `data` slice by
-predicate local-name, so the client is robust to IRI compaction.
-
-## Local files (`source: local`)
-
-`LocalFileCorpus` reads a file or a directory of files:
-
-- **FASTA** (`.fa`/`.fasta`/`.fna`) — one record per sequence; labels parsed from
-  `key=value` tokens in the header when `label_key` is set.
-- **SBOL RDF** (`.ttl`/`.rdf`/`.xml`/`.nt`) — parsed with rdflib. When the
-  document has SBOL3 `Component` top-levels, one record is yielded per Component,
-  carrying its `sequence` (`hasSequence`), `roles`/`types`, annotated `features`
-  (`hasFeature` → SubComponent / SequenceFeature, with roles and `Range`
-  locations), and the composition `GraphSlice`. So real SBOL3 designs feed the
-  `structure_aware` and `graph` modalities, not just `sequence`. Documents
-  without Components — bare `sbol:Sequence` subjects, including SBOL2
-  `ComponentDefinition` sequences — yield one sequence-only record each.
+`FastaCorpus` reads a `.fa`/`.fasta`/`.fna`/`.faa` file (or a directory of them),
+one record per sequence. Labels are parsed from `key=value` tokens in the header
+when `label_key` is set. The alphabet is auto-detected (DNA/RNA/protein) unless
+`corpus.alphabet` overrides it.
 
 ```
 >partA measure=12.5
 ACGTACGT...
 ```
 
-### Normalizing other formats to SBOL3
+## Tables (`source: table`)
 
-GenBank and SBOL2 inputs reach the SBOL3 path through the [`sbol`](https://github.com/marpaia/sbol-rs)
-CLI, run as an offline preprocessing step. Install it with Cargo:
+`TableCorpus` reads CSV/TSV — the shape most public sequence-activity datasets
+ship in — one `Design` per row. Set `sequence_column` and, for supervised runs,
+`label_column` (plus optional `id_column`). The delimiter follows the extension
+(`.tsv` → tab). This is the most direct path for labeled sequence corpora.
 
-```bash
-cargo install sbol-cli
+```yaml
+corpus:
+  source: table
+  path: data/promoters.csv
+  sequence_column: sequence
+  label_column: strength
 ```
 
-`scripts/normalize_sbol.sh` then converts a directory of mixed inputs into SBOL3
-Turtle:
+## GenBank (`source: genbank`)
 
-```bash
-NAMESPACE=https://example.org/mydesigns scripts/normalize_sbol.sh raw/ normalized/
-# then point a local corpus at normalized/ with fmt: sbol
-```
+`GenbankCorpus` imports `.gb`/`.gbk` files to SBOL 3 in-process via the native
+sbol-rs binding, yielding a `Design` per record with sequence, SO-mapped
+features, and the composition graph — so GenBank feeds the `structure_aware` and
+`graph` modalities, not just `sequence`. `namespace` roots the resulting
+identities (GenBank carries none) and is required.
 
-The `sbol` binary is located via the `SBOL_BIN` environment variable, then an
-`SBOL_BIN=` line in the repo-root `.env`, then `sbol` on `PATH` (where
-`cargo install` puts it). `examples/normalize_and_ingest.py` runs this end to end
-against a bundled GenBank demo.
+## SBOL (`source: sbol`)
 
-GenBank (`.gb`/`.gbk`) is imported, SBOL2 RDF is upgraded, and existing SBOL3 is
-re-serialized to Turtle. `NAMESPACE` roots the resulting top-levels and is
-required for GenBank (which carries no namespace). **FASTA is excluded** — the
-importer writes a header's `key=value` into `sbol:description` rather than a
-numeric predicate, so labels would not survive; feed labeled FASTA directly with
-`fmt: fasta`, whose header parsing reads `measure=...` correctly.
+`SbolFileCorpus` reads SBOL RDF (`.ttl`/`.rdf`/`.xml`/`.nt`). SBOL 3 documents are
+read directly; SBOL 2 documents are upgraded to SBOL 3 — both in-process through
+the binding. Documents with `Component` top-levels yield one record per Component
+(sequence, annotated features, composition graph); documents of bare sequences
+yield one sequence-only record each. A numeric `label_key` is read from a matching
+annotation predicate on the object.
+
+GenBank import and SBOL parsing are handled by the vendored PyO3 bindings to
+[sbol-rs](https://github.com/marpaia/sbol-rs) — no external tool or RDF library is
+involved.
+
+## sbol-db (`source: sbol_db`)
+
+`SbolDbClient` (`synbiotorch.sources.sbol_db`) is a typed client over the sbol-db
+REST API. Iterating it streams objects matching the configured `record_class` /
+`role` / `document_id` filters, reading the supervised label from each object's
+JSON-LD slice when `label_key` is set.
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `list_objects(...)` | `GET /objects/list` | Keyset-paginated stream of object records. |
+| `get_object(iri)` | `GET /objects` | Resolve one object by IRI. |
+| `lookup_objects(iris)` | `POST /objects/lookup` | Resolve up to 1000 IRIs at once. |
+| `neighborhood(iri, ...)` | `GET /objects/neighborhood` | Bounded graph traversal, returning a `GraphSlice`. |
+| `search_sequence(pattern, ...)` | `GET /sequences/search` | k-mer-indexed substring + reverse-complement search. |
+| `ontology_descendants(iri)` | `GET /ontology/descendants` | Transitive `is_a` expansion of a role/type term. |
+
+Sequence elements are extracted from the lossless JSON-LD `data` slice by
+predicate local-name, so the client is robust to IRI compaction.
 
 ## Synthetic (`source: synthetic`)
 
-`sboltorch.data.synthetic` generates deterministic transcriptional units, each
-ordering a promoter, RBS, CDS, and terminator, as `SbolObject`s carrying
+`synbiotorch.sources.synthetic` generates deterministic transcriptional units,
+each ordering a promoter, RBS, CDS, and terminator, as `Design`s carrying
 sequence, features (sub-components with `Range` locations, roles, orientation),
 and a composition `GraphSlice`. Parts come from a shared catalog, so a given part
-recurs across components and the composition graphs overlap rather than standing
-alone. A per-promoter "strength" provides a learnable supervised label.
+recurs across components and the composition graphs overlap. A per-promoter
+"strength" provides a learnable supervised label. This drives development and
+testing of the structure-aware and graph modalities without external data.
 
 ```python
-from sboltorch.data import generate_components, SyntheticCorpus, write_sbol_turtle
-components = generate_components(128, seed=0)        # SbolObjects with sequence, features, graph
-write_sbol_turtle(components, "out.ttl")             # serialize to SBOL3 Turtle
+from synbiotorch.sources import generate_components, write_sbol_turtle
+designs = generate_components(128, seed=0)       # Designs with sequence, features, graph
+write_sbol_turtle(designs, "out.ttl")            # serialize to SBOL3 Turtle
 ```
-
-This drives development and testing of the structure-aware and graph modalities
-without a populated sbol-db.
 
 ## Materialization & caching
 
@@ -118,7 +111,7 @@ iterates shards lazily, assigns each record to a partition by `hash` split, and 
 under a multi-worker DataLoader — gives each worker a disjoint set of shards.
 
 ```bash
-sboltorch ingest examples/configs/train_graph.yaml   # materialize without training
+synbiotorch ingest examples/configs/ingest_genbank.yaml   # materialize without training
 ```
 
 ## Test fixtures

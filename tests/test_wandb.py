@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from sboltorch.config import (
+from synbiotorch.config import (
     ArchConfig,
     CorpusConfig,
     EncoderConfig,
@@ -23,16 +23,16 @@ from sboltorch.config import (
     TrainConfig,
     WandbConfig,
 )
-from sboltorch.data.materialize import MaterializedCorpus
-from sboltorch.datasets.dataset import Collator, EncodedDataset
-from sboltorch.datasets.splits import Split
-from sboltorch.encoders.sequence import SequenceEncoder
-from sboltorch.engine.callbacks import Callback, WandbLogger, _namespaced
-from sboltorch.engine.trainer import Trainer
-from sboltorch.pipeline import run_training
-from sboltorch.tasks.supervised import SupervisedTask
-from sboltorch.tokenize.kmer import KmerTokenizer
-from sboltorch.types import Alphabet, SbolObject, SbolSequence
+from synbiotorch.data.materialize import MaterializedCorpus
+from synbiotorch.datasets.dataset import Collator, EncodedDataset
+from synbiotorch.datasets.splits import Split
+from synbiotorch.encoders.sequence import SequenceEncoder
+from synbiotorch.engine.callbacks import Callback, WandbLogger, _namespaced
+from synbiotorch.engine.trainer import Trainer
+from synbiotorch.pipeline import run_training
+from synbiotorch.tasks.supervised import SupervisedTask
+from synbiotorch.tokenize.kmer import KmerTokenizer
+from synbiotorch.types import Alphabet, Design, Sequence
 
 CPU = torch.device("cpu")
 
@@ -88,7 +88,7 @@ class FakeWandb:
 @pytest.fixture
 def fake_wandb(monkeypatch: pytest.MonkeyPatch) -> FakeWandb:
     fake = FakeWandb()
-    monkeypatch.setattr("sboltorch.engine.callbacks.wandb", fake)
+    monkeypatch.setattr("synbiotorch.engine.callbacks.wandb", fake)
     return fake
 
 
@@ -105,15 +105,15 @@ class TinyModel(nn.Module):
         return self.head(pooled).squeeze(-1)
 
 
-def _objects(n: int = 32) -> list[SbolObject]:
+def _objects(n: int = 32) -> list[Design]:
     objs = []
     for i in range(n):
         seq = ("GC" * 10) if i % 2 == 0 else ("AT" * 10)
         objs.append(
-            SbolObject(
+            Design(
                 iri=f"s{i}",
-                sbol_class="http://sbols.org/v3#Sequence",
-                sequence=SbolSequence(elements=seq, alphabet=Alphabet.DNA),
+                record_class="http://sbols.org/v3#Sequence",
+                sequence=Sequence(elements=seq, alphabet=Alphabet.DNA),
                 label=1.0 if i % 2 == 0 else 0.0,
             )
         )

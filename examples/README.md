@@ -1,6 +1,6 @@
 # Examples
 
-Runnable example configs and a Python quickstart for sbol-torch.
+Runnable example configs and a Python quickstart for synbio-torch.
 
 ## Quickstart (offline)
 
@@ -16,7 +16,7 @@ python examples/quickstart.py
 Run any config with the CLI:
 
 ```bash
-sboltorch train examples/configs/<name>.yaml
+synbiotorch train examples/configs/<name>.yaml
 ```
 
 | Config | Task | Data | Prerequisites |
@@ -25,36 +25,25 @@ sboltorch train examples/configs/<name>.yaml
 | [`finetune_structure_aware.yaml`](configs/finetune_structure_aware.yaml) | Structure-aware regression (from scratch) | synthetic | `WANDB_API_KEY` (or set `wandb.enabled: false`) |
 | [`pretrain_mlm.yaml`](configs/pretrain_mlm.yaml) | From-scratch MLM pretraining | sbol-db | a running sbol-db at `base_url` |
 | [`finetune_expression.yaml`](configs/finetune_expression.yaml) | Frozen DNABERT-2 → regression | sbol-db | a running sbol-db, plus DNABERT-2 (Linux/GPU — see [backbones](../docs/backbones.md)) |
-| [`ingest_local_sbol.yaml`](configs/ingest_local_sbol.yaml) | Structure-aware on normalized SBOL3 | local files | the [`sbol`](https://github.com/marpaia/sbol-rs) CLI (`SBOL_BIN`) |
+| [`finetune_protein.yaml`](configs/finetune_protein.yaml) | Protein regression (from scratch) | [`data/protein_activity.csv`](data/protein_activity.csv) | none — runs offline |
+| [`benchmark_dna_classification.yaml`](configs/benchmark_dna_classification.yaml) | DNA sequence classification | [`data/promoter_strength.csv`](data/promoter_strength.csv) | DNABERT-2 from the hub (network) |
+| [`ingest_genbank.yaml`](configs/ingest_genbank.yaml) | Import GenBank to the Parquet cache | [`data/demo_tu.gb`](data/demo_tu.gb) | none — runs offline |
 
-The two `synthetic`-source configs are the quickest way to see the full pipeline
-end to end. To point a config at your own data, change the `corpus` section (see
+The `synthetic` and CSV configs are the quickest way to see the full pipeline end
+to end. To point a config at your own data, change the `corpus` section (see
 [configuration](../docs/configuration.md) and [data sources](../docs/data.md)).
 
-## Normalizing other formats to SBOL3
+## GenBank and SBOL
 
-`normalize_and_ingest.py` bridges a GenBank file into a materialized,
-structure-aware corpus: it converts [`data/demo_tu.gb`](data/demo_tu.gb) to SBOL3
-with the [`sbol`](https://github.com/marpaia/sbol-rs) CLI, then parses the
-sequence, features, and composition graph back out. Install the CLI with Cargo:
+GenBank and SBOL are parsed in-process by the native sbol-rs binding — no external
+tool. Import a GenBank file to the Parquet cache with:
 
 ```bash
-cargo install sbol-cli
+synbiotorch ingest examples/configs/ingest_genbank.yaml
 ```
 
-```bash
-python examples/normalize_and_ingest.py
-```
-
-The `sbol` binary is located via the `SBOL_BIN` environment variable or an
-`SBOL_BIN=` line in the repo-root `.env` (the same file that holds
-`WANDB_API_KEY`); `cargo install` puts it on `PATH`. The conversion writes
-`data/normalized/`, which
-[`ingest_local_sbol.yaml`](configs/ingest_local_sbol.yaml) then reads:
-
-```bash
-sboltorch train examples/configs/ingest_local_sbol.yaml
-```
+Point `corpus.path` at a directory of `.gb`/`.gbk` (or `.ttl`/`.xml` for SBOL)
+files to build a real corpus; `corpus.namespace` roots the imported identities.
 
 ## Weights & Biases
 

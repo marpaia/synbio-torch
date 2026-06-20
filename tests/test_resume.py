@@ -11,15 +11,15 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from sboltorch.config import TrainConfig
-from sboltorch.datasets.dataset import Collator, EncodedDataset
-from sboltorch.encoders.sequence import SequenceEncoder
-from sboltorch.engine.callbacks import MetricLogger, PeriodicCheckpoint
-from sboltorch.engine.trainer import Callback, Trainer, resolve_precision
-from sboltorch.reproducibility import set_seed
-from sboltorch.tasks.supervised import SupervisedTask
-from sboltorch.tokenize.kmer import KmerTokenizer
-from sboltorch.types import Alphabet, SbolObject, SbolSequence
+from synbiotorch.config import TrainConfig
+from synbiotorch.datasets.dataset import Collator, EncodedDataset
+from synbiotorch.encoders.sequence import SequenceEncoder
+from synbiotorch.engine.callbacks import MetricLogger, PeriodicCheckpoint
+from synbiotorch.engine.trainer import Callback, Trainer, resolve_precision
+from synbiotorch.reproducibility import set_seed
+from synbiotorch.tasks.supervised import SupervisedTask
+from synbiotorch.tokenize.kmer import KmerTokenizer
+from synbiotorch.types import Alphabet, Design, Sequence
 
 CPU = torch.device("cpu")
 
@@ -52,15 +52,15 @@ class StopAfter(Callback):
             trainer.should_stop = True
 
 
-def _objects(n: int = 64) -> list[SbolObject]:
+def _objects(n: int = 64) -> list[Design]:
     objs = []
     for i in range(n):
         seq = ("GC" * 12) if i % 2 == 0 else ("AT" * 12)
         objs.append(
-            SbolObject(
+            Design(
                 iri=f"s{i}",
-                sbol_class="http://sbols.org/v3#Sequence",
-                sequence=SbolSequence(elements=seq, alphabet=Alphabet.DNA),
+                record_class="http://sbols.org/v3#Sequence",
+                sequence=Sequence(elements=seq, alphabet=Alphabet.DNA),
                 label=1.0 if i % 2 == 0 else 0.0,
             )
         )

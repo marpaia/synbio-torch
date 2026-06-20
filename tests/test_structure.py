@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from sboltorch.config import RunConfig
-from sboltorch.data.materialize import materialize
-from sboltorch.data.synthetic import SyntheticCorpus, generate_components
-from sboltorch.encoders.structure import DEFAULT_ROLES, StructureAwareEncoder
-from sboltorch.pipeline import run_training
-from sboltorch.tokenize.kmer import KmerTokenizer
+from synbiotorch.config import RunConfig
+from synbiotorch.data.materialize import materialize
+from synbiotorch.encoders.structure import DEFAULT_ROLES, StructureAwareEncoder
+from synbiotorch.pipeline import run_training
+from synbiotorch.sources.synthetic import SyntheticCorpus, generate_components
+from synbiotorch.tokenize.kmer import KmerTokenizer
 
 
 def test_encoder_vocab_extends_base_with_markers():
@@ -40,11 +40,11 @@ def test_encoder_marks_reverse_complement_orientation():
 
 
 def test_encoder_without_features_falls_back_to_plain_sequence():
-    from sboltorch.types import Alphabet, SbolObject, SbolSequence
+    from synbiotorch.types import Alphabet, Design, Sequence
 
     tok = KmerTokenizer(k=3, max_length=256)
     enc = StructureAwareEncoder(tok)
-    obj = SbolObject(iri="x", sbol_class="c", sequence=SbolSequence(elements="ACGTACGTACGT", alphabet=Alphabet.DNA))
+    obj = Design(iri="x", record_class="c", sequence=Sequence(elements="ACGTACGTACGT", alphabet=Alphabet.DNA))
     out = enc.encode(obj)
     assert all(i < tok.vocab_size for i in out.input_ids)  # no markers
 

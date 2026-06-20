@@ -1,0 +1,9 @@
+"""Type stub for the native sbol-rs binding (``synbiotorch._sbol``).
+
+Each function parses its input and returns a JSON string: a list of record
+objects (see ``synbiotorch.sources.sbol`` for the consuming mapping).
+"""
+
+def import_genbank(namespace: str, text: str) -> str: ...
+def read_sbol3(text: str, fmt: str) -> str: ...
+def upgrade_sbol2(text: str, fmt: str, namespace: str | None = ...) -> str: ...

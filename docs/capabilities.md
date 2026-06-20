@@ -1,6 +1,6 @@
 # Capabilities
 
-sbol-torch trains transformer models on SBOL data. The input modality, training
+synbio-torch trains transformer models on SBOL data. The input modality, training
 objective, data source, and tokenizer are independent axes, each picked in
 configuration. Changing one reuses the same code path rather than branching it.
 
@@ -19,7 +19,7 @@ configuration. Changing one reuses the same code path rather than branching it.
   so the model sees SBOL structure alongside sequence. Use it with a
   `from_scratch` model, or a pretrained backbone whose embeddings you've resized.
 - **Graph** turns each object's neighborhood into a graph: nodes carry a
-  `(sbol_class, role, identity)` feature triple, edges carry a predicate type,
+  `(record_class, role, identity)` feature triple, edges carry a predicate type,
   edges are bidirectional, and a global mean pool feeds the task head.
 
 All three produce batches consumed by one training engine through a
@@ -43,7 +43,7 @@ All three produce batches consumed by one training engine through a
   like `gpt_neox` for long context) on next-token prediction. Pair it with
   `packing` to train on fixed-length blocks. The run writes its model to
   `<output_dir>/backbone/`; to generate, point `model.backbone` at that directory
-  with `from_scratch: false` and run `sboltorch generate <config> --prompt <seq>`,
+  with `from_scratch: false` and run `synbiotorch generate <config> --prompt <seq>`,
   which completes a design from a prefix (greedy with `--temperature 0`, or sampled
   with `--temperature`/`--top-k`/`--top-p`). The same is available in Python as
   `st.generate_sequence(model, tokenizer, prompt, max_new_tokens=...)`.
@@ -67,7 +67,7 @@ MLM supports two modes via `model.from_scratch`:
 |-----------|-------------|
 | `hf` | Any pretrained HuggingFace `AutoTokenizer` (DNABERT-2, Nucleotide Transformer, …), wrapped behind the library's tokenizer protocol. |
 | `kmer` | Overlapping k-mers over `{A,C,G,T}`; ambiguous bases map to `<unk>`. |
-| `char` | IUPAC character-level. |
+| `char` | Character-level over a nucleotide (IUPAC) or protein alphabet (`tokenizer.alphabet`). |
 
 All expose the same protocol (`vocab_size`, `pad_token_id`, `mask_token_id`,
 `special_token_ids`, `tokenize_content`, `encode`), so tokenizers, encoders, and

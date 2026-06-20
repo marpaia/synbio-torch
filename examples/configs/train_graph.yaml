@@ -9,7 +9,7 @@ corpus:
   n: 512
   synthetic_seed: 0
   label_key: strength        # any non-null value enables labels for the synthetic source
-  cache_dir: .sboltorch_cache
+  cache_dir: .synbiotorch_cache
 
 encoder:
   kind: graph
@@ -42,7 +42,7 @@ train:
 # examples/run_wandb_examples.py). Set enabled: false to run without an account.
 wandb:
   enabled: true
-  project: sbol-torch-examples
+  project: synbio-torch-examples
   run_name: train_graph
   mode: online
   watch_model: true

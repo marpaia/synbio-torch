@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 from torch_geometric.data import Data
 
-from sboltorch.config import RunConfig
-from sboltorch.data.synthetic import generate_components
-from sboltorch.encoders.graph import GraphEncoder
-from sboltorch.pipeline import run_training
+from synbiotorch.config import RunConfig
+from synbiotorch.encoders.graph import GraphEncoder
+from synbiotorch.pipeline import run_training
+from synbiotorch.sources.synthetic import generate_components
 
 
 def test_encode_produces_pyg_data():
@@ -36,8 +36,8 @@ def test_subcomponent_nodes_carry_roles():
 def test_graph_model_forward():
     from torch_geometric.loader import DataLoader
 
-    from sboltorch.config import ModelConfig, TaskConfig
-    from sboltorch.models.graph import build_graph_model
+    from synbiotorch.config import ModelConfig, TaskConfig
+    from synbiotorch.models.graph import build_graph_model
 
     enc = GraphEncoder()
     batch = next(iter(DataLoader([enc.encode(c) for c in generate_components(4, seed=3)], batch_size=4)))

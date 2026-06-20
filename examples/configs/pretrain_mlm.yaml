@@ -9,8 +9,8 @@ output_dir: runs/pretrain_mlm
 corpus:
   source: sbol_db
   base_url: http://localhost:8080
-  sbol_class: http://sbols.org/v3#Sequence
-  cache_dir: .sboltorch_cache
+  record_class: http://sbols.org/v3#Sequence
+  cache_dir: .synbiotorch_cache
   # no label_key: pretraining is unlabeled
 
 tokenizer:

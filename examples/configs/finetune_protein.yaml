@@ -1,0 +1,44 @@
+# Train a from-scratch protein regressor from a labeled CSV. The table source
+# reads sequence + activity columns; the char tokenizer uses the protein
+# alphabet. Runs out of the box on the bundled examples/data/protein_activity.csv.
+seed: 42
+output_dir: runs/finetune_protein
+
+corpus:
+  source: table
+  path: examples/data/protein_activity.csv
+  sequence_column: sequence
+  label_column: activity
+  alphabet: protein
+  cache_dir: .synbiotorch_cache
+
+tokenizer:
+  kind: char
+  alphabet: protein
+  max_length: 256
+
+encoder:
+  kind: sequence
+
+model:
+  from_scratch: true
+  hidden_size: 256
+  arch:
+    num_hidden_layers: 4
+    num_attention_heads: 4
+    intermediate_size: 1024
+    max_position_embeddings: 256
+
+task:
+  kind: supervised
+  objective: regression
+
+splits:
+  strategy: random
+  ratios: [0.7, 0.15, 0.15]
+
+train:
+  batch_size: 8
+  epochs: 30
+  lr: 5.0e-4
+  amp: true

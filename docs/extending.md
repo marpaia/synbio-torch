@@ -1,12 +1,12 @@
-# Extending sbol-torch
+# Extending synbio-torch
 
-sbol-torch is a set of `Protocol`s with interchangeable implementations. Adding a
+synbio-torch is a set of `Protocol`s with interchangeable implementations. Adding a
 capability means writing one implementation and registering it in the relevant
 `build_*` factory; the training engine and pipeline stay untouched.
 
 ## Add a tokenizer
 
-Implement the `Tokenizer` protocol (`sboltorch.tokenize.base`):
+Implement the `Tokenizer` protocol (`synbiotorch.tokenize.base`):
 
 ```python
 class MyTokenizer:
@@ -28,11 +28,11 @@ Register it in `build_tokenizer` and add a `kind` to `TokenizerConfig`.
 
 ## Add an encoder (input modality)
 
-A tensor encoder implements `Encoder` (`sboltorch.encoders.base`):
+A tensor encoder implements `Encoder` (`synbiotorch.encoders.base`):
 
 ```python
 class MyEncoder:
-    def encode(self, obj: SbolObject) -> ModelInput: ...   # input_ids, attention_mask, label
+    def encode(self, obj: Design) -> ModelInput: ...   # input_ids, attention_mask, label
     @property
     def output_spec(self) -> EncoderSpec: ...              # vocab_size, pad/mask ids, max_length
 ```
@@ -43,7 +43,7 @@ are wired in the pipeline alongside a matching `BatchAdapter` and loader.
 
 ## Add an objective (task)
 
-Implement the `Task` protocol (`sboltorch.tasks.base`):
+Implement the `Task` protocol (`synbiotorch.tasks.base`):
 
 ```python
 class MyTask:
@@ -62,7 +62,7 @@ matching collator — `supervised` pads, `mlm` masks, `causal` shifts targets.
 
 ## Add a callback
 
-Subclass `Callback` (`sboltorch.engine.callbacks`) and override
+Subclass `Callback` (`synbiotorch.engine.callbacks`) and override
 `on_train_start` / `on_step_end` / `on_epoch_end` / `on_train_end`. The bundled
 callbacks are `EarlyStopping`, `ModelCheckpoint`, `PeriodicCheckpoint`,
 `MetricLogger`, and `WandbLogger`; the pipeline assembles them from config.
@@ -75,7 +75,7 @@ writes once.
 ## Add a batch modality
 
 To train on a batch shape the engine doesn't yet understand, implement a
-`BatchAdapter` (`sboltorch.engine.batch`):
+`BatchAdapter` (`synbiotorch.engine.batch`):
 
 ```python
 class MyBatchAdapter:
@@ -89,7 +89,9 @@ Pass it to `Trainer(..., batch_adapter=...)`. `TensorBatchAdapter` handles
 
 ## Add a data source
 
-Implement the `Corpus` protocol (`sboltorch.data.corpus`) — `__iter__` yielding
-`SbolObject`s and a `fingerprint()` for caching — and register it in
-`build_corpus` with a new `CorpusConfig.source`. Downstream code (materialization,
+Implement the `Corpus` protocol (`synbiotorch.data.corpus`) — `__iter__` yielding
+`Design`s and a `fingerprint()` for caching — in a module under
+`synbiotorch.sources`, then register it in `build_corpus` with a new
+`CorpusConfig.source`. The existing sources (`fasta`, `table`, `genbank`, `sbol`,
+`sbol_db`, `synthetic`) are the templates. Downstream code (materialization,
 splitting, encoding, training) works unchanged.

@@ -8,7 +8,7 @@ memory) and finishes in seconds on CPU. Demonstrates the Python API:
 
 from __future__ import annotations
 
-import sboltorch as st
+import synbiotorch as st
 
 
 def main() -> None:

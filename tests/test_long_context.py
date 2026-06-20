@@ -15,15 +15,15 @@ import pytest
 import torch
 from torch.utils.data import DataLoader
 
-from sboltorch.config import ArchConfig, ModelConfig, RunConfig, TaskConfig, TrainConfig
-from sboltorch.datasets.causal_collator import CausalCollator
-from sboltorch.datasets.packing import PackedDataset
-from sboltorch.engine.trainer import Callback, Trainer
-from sboltorch.models import build_model
-from sboltorch.reproducibility import set_seed
-from sboltorch.tasks.causal import CausalLMTask
-from sboltorch.tokenize.kmer import KmerTokenizer
-from sboltorch.types import Alphabet, SbolObject, SbolSequence
+from synbiotorch.config import ArchConfig, ModelConfig, RunConfig, TaskConfig, TrainConfig
+from synbiotorch.datasets.causal_collator import CausalCollator
+from synbiotorch.datasets.packing import PackedDataset
+from synbiotorch.engine.trainer import Callback, Trainer
+from synbiotorch.models import build_model
+from synbiotorch.reproducibility import set_seed
+from synbiotorch.tasks.causal import CausalLMTask
+from synbiotorch.tokenize.kmer import KmerTokenizer
+from synbiotorch.types import Alphabet, Design, Sequence
 
 CPU = torch.device("cpu")
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "configs"
@@ -89,10 +89,10 @@ def test_rope_decoder_learns_next_token():
     set_seed(0)
     tok = KmerTokenizer(k=3, max_length=512)
     objs = [
-        SbolObject(
+        Design(
             iri=f"https://ex/c{i}",
-            sbol_class="http://sbols.org/v3#Sequence",
-            sequence=SbolSequence(elements=("ACGT" * 30) if i % 2 else ("GGCC" * 30), alphabet=Alphabet.DNA),
+            record_class="http://sbols.org/v3#Sequence",
+            sequence=Sequence(elements=("ACGT" * 30) if i % 2 else ("GGCC" * 30), alphabet=Alphabet.DNA),
         )
         for i in range(240)
     ]

@@ -1,0 +1,20 @@
+[package]
+name = "synbiotorch-sbol"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.93"
+publish = false
+
+[lib]
+# Imported from Python as ``synbiotorch._sbol``.
+name = "_sbol"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["extension-module", "abi3-py311"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# sbol-rs is not on crates.io; pin to the published v0.2.0 tag so wheels build
+# anywhere with network access to GitHub.
+sbol = { git = "https://github.com/marpaia/sbol-rs", tag = "v0.2.0" }
+sbol-genbank = { git = "https://github.com/marpaia/sbol-rs", tag = "v0.2.0" }

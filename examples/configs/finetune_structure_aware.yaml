@@ -9,7 +9,7 @@ corpus:
   source: synthetic
   n: 512
   label_key: strength
-  cache_dir: .sboltorch_cache
+  cache_dir: .synbiotorch_cache
 
 tokenizer:
   kind: kmer
@@ -51,7 +51,7 @@ train:
 # examples/run_wandb_examples.py). Set enabled: false to run without an account.
 wandb:
   enabled: true
-  project: sbol-torch-examples
+  project: synbio-torch-examples
   run_name: structure_aware
   mode: online
   watch_model: true

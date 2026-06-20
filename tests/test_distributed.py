@@ -19,7 +19,7 @@ import torch.multiprocessing as mp
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from sboltorch.config import (
+from synbiotorch.config import (
     ArchConfig,
     CorpusConfig,
     DistributedConfig,
@@ -31,8 +31,8 @@ from sboltorch.config import (
     TokenizerConfig,
     TrainConfig,
 )
-from sboltorch.datasets.dataset import Collator, EncodedDataset
-from sboltorch.distributed import (
+from synbiotorch.datasets.dataset import Collator, EncodedDataset
+from synbiotorch.distributed import (
     DistContext,
     broadcast_flag,
     cleanup,
@@ -41,14 +41,14 @@ from sboltorch.distributed import (
     single_process_context,
     worker_shard,
 )
-from sboltorch.encoders.sequence import SequenceEncoder
-from sboltorch.engine.trainer import Trainer, _wrap_distributed
-from sboltorch.exceptions import ConfigError
-from sboltorch.pipeline import run_training
-from sboltorch.reproducibility import set_seed
-from sboltorch.tasks.supervised import SupervisedTask
-from sboltorch.tokenize.kmer import KmerTokenizer
-from sboltorch.types import SbolObject, SbolSequence
+from synbiotorch.encoders.sequence import SequenceEncoder
+from synbiotorch.engine.trainer import Trainer, _wrap_distributed
+from synbiotorch.exceptions import ConfigError
+from synbiotorch.pipeline import run_training
+from synbiotorch.reproducibility import set_seed
+from synbiotorch.tasks.supervised import SupervisedTask
+from synbiotorch.tokenize.kmer import KmerTokenizer
+from synbiotorch.types import Design, Sequence
 
 CPU = torch.device("cpu")
 
@@ -66,12 +66,12 @@ class TinyModel(nn.Module):
         return self.head(pooled).squeeze(-1)
 
 
-def _objects(n: int = 8) -> list[SbolObject]:
+def _objects(n: int = 8) -> list[Design]:
     return [
-        SbolObject(
+        Design(
             iri=f"s{i}",
-            sbol_class="http://sbols.org/v3#Sequence",
-            sequence=SbolSequence(elements=("GC" * 8) if i % 2 == 0 else ("AT" * 8)),
+            record_class="http://sbols.org/v3#Sequence",
+            sequence=Sequence(elements=("GC" * 8) if i % 2 == 0 else ("AT" * 8)),
             label=float(i),
         )
         for i in range(n)

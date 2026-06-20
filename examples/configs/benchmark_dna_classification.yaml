@@ -1,0 +1,40 @@
+# Genomics-ML benchmark shape: a labeled sequence table fed to a pretrained DNA
+# backbone for sequence classification (the Nucleotide-Transformer / GUE setup).
+# Downloads the backbone from the HuggingFace hub, so it needs network access on
+# the first run; swap model.backbone for any DNA encoder.
+seed: 42
+output_dir: runs/benchmark_dna_classification
+
+corpus:
+  source: table
+  path: examples/data/promoter_strength.csv
+  sequence_column: sequence
+  label_column: strong        # binary: is this a strong promoter?
+  cache_dir: .synbiotorch_cache
+
+tokenizer:
+  kind: hf
+  model_name: zhihan1996/DNABERT-2-117M
+  max_length: 128
+
+encoder:
+  kind: sequence
+
+model:
+  from_scratch: false
+  backbone: zhihan1996/DNABERT-2-117M
+
+task:
+  kind: supervised
+  objective: classification
+  num_classes: 2
+
+splits:
+  strategy: stratified
+  ratios: [0.7, 0.15, 0.15]
+
+train:
+  batch_size: 8
+  epochs: 20
+  lr: 2.0e-5
+  amp: true

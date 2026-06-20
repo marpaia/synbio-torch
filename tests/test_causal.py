@@ -14,7 +14,7 @@ import pytest
 import torch
 from torch.utils.data import DataLoader
 
-from sboltorch.config import (
+from synbiotorch.config import (
     ArchConfig,
     CorpusConfig,
     EncoderConfig,
@@ -26,20 +26,20 @@ from sboltorch.config import (
     TokenizerConfig,
     TrainConfig,
 )
-from sboltorch.datasets.causal_collator import CausalCollator
-from sboltorch.datasets.mlm_collator import IGNORE_INDEX
-from sboltorch.datasets.packing import PackedDataset
-from sboltorch.encoders.base import ModelInput
-from sboltorch.engine.trainer import Callback, Trainer
-from sboltorch.generate import generate, generate_sequence
-from sboltorch.models import build_model
-from sboltorch.pipeline import run_training
-from sboltorch.reproducibility import set_seed
-from sboltorch.tasks.base import build_task
-from sboltorch.tasks.causal import CausalLMTask
-from sboltorch.tokenize.char import CharTokenizer
-from sboltorch.tokenize.kmer import KmerTokenizer
-from sboltorch.types import Alphabet, SbolObject, SbolSequence
+from synbiotorch.datasets.causal_collator import CausalCollator
+from synbiotorch.datasets.mlm_collator import IGNORE_INDEX
+from synbiotorch.datasets.packing import PackedDataset
+from synbiotorch.encoders.base import ModelInput
+from synbiotorch.engine.trainer import Callback, Trainer
+from synbiotorch.generate import generate, generate_sequence
+from synbiotorch.models import build_model
+from synbiotorch.pipeline import run_training
+from synbiotorch.reproducibility import set_seed
+from synbiotorch.tasks.base import build_task
+from synbiotorch.tasks.causal import CausalLMTask
+from synbiotorch.tokenize.char import CharTokenizer
+from synbiotorch.tokenize.kmer import KmerTokenizer
+from synbiotorch.types import Alphabet, Design, Sequence
 
 CPU = torch.device("cpu")
 
@@ -54,12 +54,12 @@ def _gpt2_arch(max_positions: int = 64) -> ArchConfig:
     )
 
 
-def _motif_objects(n: int, motif: str) -> list[SbolObject]:
+def _motif_objects(n: int, motif: str) -> list[Design]:
     return [
-        SbolObject(
+        Design(
             iri=f"https://ex/c{i}",
-            sbol_class="http://sbols.org/v3#Sequence",
-            sequence=SbolSequence(elements=motif, alphabet=Alphabet.DNA),
+            record_class="http://sbols.org/v3#Sequence",
+            sequence=Sequence(elements=motif, alphabet=Alphabet.DNA),
         )
         for i in range(n)
     ]

@@ -1,9 +1,9 @@
 [project]
-# Distribution name on PyPI is hyphenated (`pip install sbol-torch`); the import
-# package is `sboltorch` (commonly `import sboltorch as st`).
-name = "sbol-torch"
-version = "0.1.1"
-description = "A PyTorch library for synthetic biology and biodesign automation"
+# Distribution name on PyPI is hyphenated (`pip install synbio-torch`); the import
+# package is `synbiotorch` (commonly `import synbiotorch as st`).
+name = "synbio-torch"
+version = "0.2.0"
+description = "A PyTorch library for synthetic biology and biodesign machine learning"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -14,7 +14,6 @@ dependencies = [
     "pyarrow>=24",
     "numpy>=2.4",
     "pyyaml>=6",
-    "rdflib>=7.6",
     "torch>=2.12",
     # Pin to the 4.x line: transformers 5.x breaks the custom/ESM modeling code
     # the pretrained DNA backbones (Nucleotide Transformer, DNABERT) target.
@@ -36,17 +35,25 @@ dev = [
     "mypy>=2.1",
     "pre-commit>=4.6",
     "types-PyYAML>=6.0",
+    "maturin>=1.7",
 ]
 
 [project.scripts]
-sboltorch = "sboltorch.cli:main"
+synbiotorch = "synbiotorch.cli:main"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/sboltorch"]
+[tool.maturin]
+# Mixed Python/Rust project: Python lives under src/, the Rust crate under rust/.
+# The compiled extension is importable as ``synbiotorch._sbol``.
+python-source = "src"
+manifest-path = "rust/Cargo.toml"
+module-name = "synbiotorch._sbol"
+features = ["pyo3/extension-module"]
+# Bundle the license into the sdist; its metadata declares License-File: LICENSE.
+include = ["LICENSE"]
 
 [tool.black]
 line-length = 120
@@ -60,11 +67,11 @@ line_length = 120
 # OS and installed packages (e.g. misclassifying wandb as first-party), making
 # the same code pass on one host and fail on another.
 src_paths = ["src"]
-known_first_party = ["sboltorch"]
+known_first_party = ["synbiotorch"]
 
 [tool.mypy]
 python_version = "3.11"
 warn_unused_configs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
-files = ["src/sboltorch"]
+files = ["src/synbiotorch"]
