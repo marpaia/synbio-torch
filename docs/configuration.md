@@ -138,12 +138,36 @@ record — both reproducible across runs.
 | `checkpoint_every_n_steps` | int | `null` | Write a rolling, resumable `last.pt` every N steps. |
 | `gradient_checkpointing` | bool | `false` | Trade compute for memory in the transformer (HuggingFace backbones/LMs). |
 | `compile` | bool | `false` | Wrap the model in `torch.compile`. |
+| `distributed` | object | defaults | Multi-GPU / multi-node strategy (single-process by default). |
 | `early_stop` | object | `null` | Omit to disable. |
 
 Checkpoints (`best.pt`, `last.pt`) carry full optimizer/scheduler/scaler/RNG
 state. Resume a run with `sboltorch train <config> --resume <output_dir>/last.pt`;
 it continues from the next epoch boundary after the checkpointed one, with the
 step counter and LR schedule intact.
+
+### `train.distributed`
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `strategy` | `none` \| `ddp` | `none` | `ddp` replicates the model and all-reduces gradients across ranks (works on CPU/gloo). It does not shard parameters, so it gives no memory saving. |
+| `find_unused_parameters` | bool | `false` | DDP only; enable when some parameters get no gradient (e.g. an unused pooler). |
+
+Launch a distributed run with `torchrun`, which sets the rank/world environment:
+
+```bash
+torchrun --nproc_per_node=<gpus> -m sboltorch.cli train <config>   # set train.distributed.strategy: ddp
+```
+
+Each rank reads a disjoint slice of the data (a `DistributedSampler` for in-memory
+corpora; rank×worker shard assignment for `streaming`). Only rank 0 writes
+checkpoints, `metrics.jsonl`, and W&B; validation metrics are averaged across
+ranks so metric-driven decisions stay consistent.
+
+`ddp` is for data-parallel scaling, not for fitting a model larger than one
+device. Sharded training (FSDP/ZeRO), which shards parameters/grads/optimizer
+state across GPUs, is a planned addition that needs validation on real GPU
+hardware and is not part of this layer yet.
 
 ### `train.early_stop`
 

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, DistributedSampler
 
 from sboltorch.config import RunConfig
 from sboltorch.data.corpus import build_corpus
@@ -23,6 +23,7 @@ from sboltorch.datasets.mlm_collator import MlmCollator
 from sboltorch.datasets.packing import PackedDataset
 from sboltorch.datasets.splits import Split, make_split
 from sboltorch.datasets.streaming import StreamingEncodedDataset
+from sboltorch.distributed import DistContext, barrier, cleanup, setup_distributed
 from sboltorch.encoders.base import build_encoder
 from sboltorch.engine.callbacks import (
     Callback,
@@ -76,14 +77,23 @@ def _loader(
     encoder: object,
     collator: Callable[[list[Any]], Any],
     config: RunConfig,
+    ctx: DistContext,
     *,
     shuffle: bool,
 ) -> DataLoader:
     dataset = EncodedDataset([objects[i] for i in indices], encoder)  # type: ignore[arg-type]
+    # Under DDP a DistributedSampler gives each rank a disjoint slice; it owns the
+    # shuffle, so the DataLoader's own shuffle is off when a sampler is present.
+    sampler: DistributedSampler | None = (
+        DistributedSampler(dataset, num_replicas=ctx.world_size, rank=ctx.rank, shuffle=shuffle, seed=config.seed)
+        if ctx.is_distributed
+        else None
+    )
     return DataLoader(
         dataset,
         batch_size=config.train.batch_size,
-        shuffle=shuffle,
+        shuffle=shuffle and sampler is None,
+        sampler=sampler,
         num_workers=config.train.num_workers,
         collate_fn=collator,
     )
@@ -99,15 +109,15 @@ def _collator_for(config: RunConfig, tokenizer: Any, task: Task) -> Callable[[li
     return Collator(tokenizer.pad_token_id, with_labels=True, label_dtype=task.label_dtype)
 
 
-def _build_sequence_run(config: RunConfig, data: PreparedData, task: Task) -> tuple:
+def _build_sequence_run(config: RunConfig, data: PreparedData, task: Task, ctx: DistContext) -> tuple:
     """Build (model, train_loader, val_loader, adapter) for the sequence/MLM/causal path."""
     tokenizer = build_tokenizer(config.tokenizer)
     encoder = build_encoder(config.encoder, tokenizer)
     spec = encoder.output_spec
     model = build_model(config.model, config.task, vocab_size=spec.vocab_size, pad_token_id=spec.pad_token_id)
     collator = _collator_for(config, tokenizer, task)
-    train_loader = _loader(data.objects, data.split.train, encoder, collator, config, shuffle=True)
-    val_loader = _loader(data.objects, data.split.val, encoder, collator, config, shuffle=False)
+    train_loader = _loader(data.objects, data.split.train, encoder, collator, config, ctx, shuffle=True)
+    val_loader = _loader(data.objects, data.split.val, encoder, collator, config, ctx, shuffle=False)
     return model, train_loader, val_loader, None
 
 
@@ -183,17 +193,36 @@ def _build_graph_run(config: RunConfig, data: PreparedData) -> tuple:
 
 def run_training(config: RunConfig, *, resume_from: str | Path | None = None) -> dict[str, float]:
     """Run the full training pipeline and return the final epoch's metrics."""
+    ctx = setup_distributed(config.train.distributed.strategy)
+    try:
+        return _run(config, ctx, resume_from)
+    finally:
+        cleanup(ctx)
+
+
+def _run(config: RunConfig, ctx: DistContext, resume_from: str | Path | None) -> dict[str, float]:
     set_seed(config.seed)
     output_dir = Path(config.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "config.resolved.yaml").write_text(config.to_yaml())
+    if ctx.is_main:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "config.resolved.yaml").write_text(config.to_yaml())
 
     task = build_task(config.task)
     streaming = config.streaming or config.packing.enabled
 
+    # Rank 0 populates the shared Parquet cache first; the others wait, then read
+    # it — otherwise ranks race to write the same shards. Later materialize() calls
+    # hit the cache and are no-ops.
+    if ctx.is_distributed:
+        if ctx.is_main:
+            materialize(build_corpus(config.corpus), config.corpus.cache_dir, shard_size=config.corpus.shard_size)
+        barrier(ctx)
+
     if config.encoder.kind == "graph":
         if streaming:
             raise ConfigError("streaming/packing is not supported for the graph modality")
+        if ctx.is_distributed:
+            raise ConfigError("distributed training is not supported for the graph modality")
         data = prepare_data(config)
         model, train_loader, val_loader, adapter = _build_graph_run(config, data)
         corpus_ref, split_ref = data.corpus, data.split
@@ -207,31 +236,33 @@ def run_training(config: RunConfig, *, resume_from: str | Path | None = None) ->
         corpus_ref, split_ref = materialized, Split((), (), ())
     else:
         data = prepare_data(config)
-        model, train_loader, val_loader, adapter = _build_sequence_run(config, data, task)
+        model, train_loader, val_loader, adapter = _build_sequence_run(config, data, task, ctx)
         corpus_ref, split_ref = data.corpus, data.split
 
     metric_name, mode = task.primary_metric
     monitored = f"val_{metric_name}"
+    # Writing callbacks act only on the main rank; metric-driven ones run on all
+    # ranks (metrics are reduced to identical values, so decisions agree).
     callbacks: list[Callback] = [
-        MetricLogger(output_dir),
-        ModelCheckpoint(output_dir, monitor=monitored, mode=mode),
+        MetricLogger(output_dir, is_main=ctx.is_main),
+        ModelCheckpoint(output_dir, monitor=monitored, mode=mode, is_main=ctx.is_main),
     ]
     if config.train.checkpoint_every_n_steps:
-        callbacks.append(PeriodicCheckpoint(output_dir, config.train.checkpoint_every_n_steps))
+        callbacks.append(PeriodicCheckpoint(output_dir, config.train.checkpoint_every_n_steps, is_main=ctx.is_main))
     if config.train.early_stop is not None:
         es = config.train.early_stop
         callbacks.append(EarlyStopping(monitor=es.monitor, mode=es.mode, patience=es.patience, min_delta=es.min_delta))
     if config.wandb.enabled:
-        callbacks.append(WandbLogger(config, corpus_ref, split_ref, output_dir))
+        callbacks.append(WandbLogger(config, corpus_ref, split_ref, output_dir, is_main=ctx.is_main))
 
-    trainer = Trainer(model, task, config.train, callbacks=callbacks, batch_adapter=adapter)
+    trainer = Trainer(model, task, config.train, callbacks=callbacks, batch_adapter=adapter, dist_ctx=ctx)
     metrics = trainer.fit(train_loader, val_loader, resume_from=resume_from)
-    (output_dir / "final_metrics.json").write_text(json.dumps(metrics, indent=2))
 
-    # Write the pretrained model in HF format so a later run (a supervised
-    # fine-tune, or generation for a causal LM) can point `model.backbone` here.
-    if isinstance(model, (MaskedLMModel, CausalLMModel)):
-        backbone_dir = output_dir / "backbone"
-        model.save_pretrained(backbone_dir)
+    if ctx.is_main:
+        (output_dir / "final_metrics.json").write_text(json.dumps(metrics, indent=2))
+        # Write the pretrained model in HF format so a later run (a supervised
+        # fine-tune, or generation for a causal LM) can point `model.backbone` here.
+        if isinstance(model, (MaskedLMModel, CausalLMModel)):
+            model.save_pretrained(output_dir / "backbone")
 
     return metrics

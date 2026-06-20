@@ -165,6 +165,19 @@ class WandbConfig(BaseModel):
     log_model: bool = True
 
 
+class DistributedConfig(BaseModel):
+    """Multi-GPU / multi-node strategy. ``none`` is plain single-process.
+
+    ``ddp`` replicates the model and all-reduces gradients across ranks (works on
+    CPU/gloo, so the orchestration is testable without GPUs). It does not shard
+    parameters, so it gives no memory saving — training a model larger than one
+    device (e.g. via FSDP) is a future addition that needs GPU validation.
+    """
+
+    strategy: Literal["none", "ddp"] = "none"
+    find_unused_parameters: bool = False
+
+
 class PackingConfig(BaseModel):
     """Token packing for language-model pretraining: concatenate tokenized
     documents into fixed-length ``block_size`` blocks with no padding."""
@@ -194,6 +207,7 @@ class TrainConfig(BaseModel):
     checkpoint_every_n_steps: int | None = None
     gradient_checkpointing: bool = False
     compile: bool = False
+    distributed: DistributedConfig = Field(default_factory=DistributedConfig)
     early_stop: EarlyStopConfig | None = None
 
 

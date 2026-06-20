@@ -14,6 +14,7 @@ from typing import Iterable, Iterator
 from torch.utils.data import IterableDataset, get_worker_info
 
 from sboltorch.datasets.splits import split_of
+from sboltorch.distributed import env_rank_world, worker_shard
 from sboltorch.encoders.base import SupportsEncode
 from sboltorch.types import SbolObject
 
@@ -24,22 +25,26 @@ def iter_split_records(
     ratios: tuple[float, float, float],
     seed: int,
 ) -> Iterator[SbolObject]:
-    """Yield the records of ``source`` for this worker that fall in ``which`` split.
+    """Yield the records of ``source`` for this (rank, worker) that fall in ``which``.
 
-    Worker partitioning prefers whole-shard assignment when the source exposes
-    ``iter_for_worker`` (the materialized corpus does), avoiding every worker
-    re-reading every shard; otherwise it falls back to round-robin by record.
-    ``which=None`` keeps every record (no split filtering).
+    Partitioning is over the global pool of ``world_size * num_workers`` readers:
+    the data-parallel rank (from the environment) and the DataLoader worker are
+    combined so each reads a disjoint set of shards and the union is the whole
+    corpus. Whole-shard assignment is used when the source exposes
+    ``iter_for_worker`` (the materialized corpus does); otherwise it falls back to
+    round-robin by record. ``which=None`` keeps every record (no split filter).
     """
     info = get_worker_info()
     num_workers = info.num_workers if info is not None else 1
     worker_id = info.id if info is not None else 0
+    rank, world_size = env_rank_world()
+    global_id, global_count = worker_shard(rank, world_size, worker_id, num_workers)
 
     iter_for_worker = getattr(source, "iter_for_worker", None)
     if callable(iter_for_worker):
-        records: Iterable[SbolObject] = iter_for_worker(worker_id, num_workers)
+        records: Iterable[SbolObject] = iter_for_worker(global_id, global_count)
     else:
-        records = (obj for i, obj in enumerate(source) if i % num_workers == worker_id)
+        records = (obj for i, obj in enumerate(source) if i % global_count == global_id)
 
     for obj in records:
         if which is None or split_of(obj.iri, ratios, seed) == which:

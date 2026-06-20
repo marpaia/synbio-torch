@@ -48,12 +48,16 @@ class EarlyStopping(Callback):
 
 
 class ModelCheckpoint(Callback):
-    """Saves the model state dict whenever the monitored metric improves."""
+    """Saves the model state dict whenever the monitored metric improves.
 
-    def __init__(self, output_dir: str | Path, monitor: str, mode: str = "min") -> None:
+    Under distributed training only the main rank writes; every rank tracks the
+    best metric identically (metrics are reduced before callbacks see them)."""
+
+    def __init__(self, output_dir: str | Path, monitor: str, mode: str = "min", *, is_main: bool = True) -> None:
         self.output_dir = Path(output_dir)
         self.monitor = monitor
         self.mode = mode
+        self.is_main = is_main
         self._best = float("inf") if mode == "min" else float("-inf")
         self.best_path: Path | None = None
 
@@ -64,6 +68,8 @@ class ModelCheckpoint(Callback):
         if not _is_improvement(current, self._best, self.mode, min_delta=0.0):
             return
         self._best = current
+        if not self.is_main:
+            return
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.best_path = self.output_dir / "best.pt"
         trainer.save_checkpoint(self.best_path, epoch=epoch, metrics=metrics)
@@ -77,30 +83,38 @@ class PeriodicCheckpoint(Callback):
     resume after an interruption. Resume continues from the next epoch boundary.
     """
 
-    def __init__(self, output_dir: str | Path, every_n_steps: int, filename: str = "last.pt") -> None:
+    def __init__(
+        self, output_dir: str | Path, every_n_steps: int, filename: str = "last.pt", *, is_main: bool = True
+    ) -> None:
         self.output_dir = Path(output_dir)
         self.every_n_steps = every_n_steps
         self.filename = filename
+        self.is_main = is_main
 
     def on_step_end(self, trainer: Trainer, step: int, logs: dict[str, float]) -> None:
-        if self.every_n_steps <= 0 or step % self.every_n_steps != 0:
+        if not self.is_main or self.every_n_steps <= 0 or step % self.every_n_steps != 0:
             return
         self.output_dir.mkdir(parents=True, exist_ok=True)
         trainer.save_checkpoint(self.output_dir / self.filename, epoch=trainer.current_epoch, metrics={})
 
 
 class MetricLogger(Callback):
-    """Prints per-epoch metrics and appends them to ``metrics.jsonl``."""
+    """Prints per-epoch metrics and appends them to ``metrics.jsonl`` (main rank only)."""
 
-    def __init__(self, output_dir: str | Path) -> None:
+    def __init__(self, output_dir: str | Path, *, is_main: bool = True) -> None:
         self.output_dir = Path(output_dir)
+        self.is_main = is_main
         self._handle: Any = None
 
     def on_train_start(self, trainer: Trainer) -> None:
+        if not self.is_main:
+            return
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._handle = (self.output_dir / "metrics.jsonl").open("a")
 
     def on_epoch_end(self, trainer: Trainer, epoch: int, metrics: dict[str, float]) -> None:
+        if not self.is_main:
+            return
         record = {"epoch": epoch, "step": trainer.global_step, **metrics}
         line = " ".join(f"{k}={v:.4f}" if isinstance(v, float) else f"{k}={v}" for k, v in record.items())
         print(line)
@@ -132,8 +146,8 @@ class WandbLogger(Callback):
     fingerprint is attached as an artifact alias, extending the library's
     reproducibility story onto the dashboard.
 
-    The trainer is single-process; if distributed training is added, init/log
-    must be gated to rank zero.
+    Under distributed training only the main rank logs; on other ranks every hook
+    is a no-op (``_run`` stays None).
     """
 
     def __init__(
@@ -142,14 +156,19 @@ class WandbLogger(Callback):
         corpus: MaterializedCorpus,
         split: Split,
         output_dir: str | Path,
+        *,
+        is_main: bool = True,
     ) -> None:
         self.config = config
         self.corpus = corpus
         self.split = split
         self.output_dir = Path(output_dir)
+        self.is_main = is_main
         self._run: Any = None
 
     def on_train_start(self, trainer: Trainer) -> None:
+        if not self.is_main:
+            return
         cfg = self.config.wandb
         self._run = wandb.init(
             project=cfg.project,
@@ -171,11 +190,13 @@ class WandbLogger(Callback):
             wandb.watch(trainer.model, log="gradients", log_freq=cfg.log_freq)
 
     def on_step_end(self, trainer: Trainer, step: int, logs: dict[str, float]) -> None:
-        if step % self.config.wandb.log_freq != 0:
+        if self._run is None or step % self.config.wandb.log_freq != 0:
             return
         self._run.log({f"train/{k}": v for k, v in logs.items()}, step=step)
 
     def on_epoch_end(self, trainer: Trainer, epoch: int, metrics: dict[str, float]) -> None:
+        if self._run is None:
+            return
         payload = _namespaced(metrics)
         payload["epoch"] = epoch
         self._run.log(payload, step=trainer.global_step)
@@ -189,6 +210,8 @@ class WandbLogger(Callback):
             )
 
     def on_train_end(self, trainer: Trainer) -> None:
+        if self._run is None:
+            return
         if self.config.wandb.log_model:
             self._log_model_artifact()
         self._run.finish()

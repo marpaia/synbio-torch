@@ -16,14 +16,17 @@ epoch boundary after an interruption.
 from __future__ import annotations
 
 import itertools
+from contextlib import nullcontext
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import ContextManager, Iterable, Sequence
 
 import numpy as np
 import torch
+from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 
 from sboltorch.config import TrainConfig
+from sboltorch.distributed import DistContext, broadcast_flag, reduce_mean, single_process_context
 from sboltorch.engine.batch import BatchAdapter, TensorBatchAdapter
 from sboltorch.exceptions import ConfigError
 from sboltorch.reproducibility import rng_state, set_rng_state
@@ -80,6 +83,19 @@ def _linear_schedule(
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
 
+def _wrap_distributed(model: torch.nn.Module, config: TrainConfig, ctx: DistContext) -> torch.nn.Module:
+    """Wrap the model for the configured distribution strategy (no-op if single-process)."""
+    strategy = config.distributed.strategy
+    if strategy == "none" or not ctx.is_distributed:
+        return model
+    if strategy == "ddp":
+        device_ids = [ctx.local_rank] if ctx.device.type == "cuda" else None
+        return DistributedDataParallel(
+            model, device_ids=device_ids, find_unused_parameters=config.distributed.find_unused_parameters
+        )
+    raise ConfigError(f"unknown distributed strategy: {strategy}")
+
+
 def _enable_gradient_checkpointing(model: torch.nn.Module) -> None:
     """Turn on HuggingFace gradient checkpointing wherever the transformer lives.
 
@@ -104,11 +120,13 @@ class Trainer:
         callbacks: Sequence[Callback] | None = None,
         device: torch.device | None = None,
         batch_adapter: BatchAdapter | None = None,
+        dist_ctx: DistContext | None = None,
     ) -> None:
         self.task = task
         self.config = config
         self.callbacks = list(callbacks or [])
-        self.device = device or select_device()
+        self.dist = dist_ctx or single_process_context(device)
+        self.device = device or self.dist.device
         self.adapter = batch_adapter or TensorBatchAdapter()
         self.should_stop = False
         self.global_step = 0
@@ -118,11 +136,13 @@ class Trainer:
         if config.gradient_checkpointing:
             _enable_gradient_checkpointing(model)
         model.to(self.device)
-        # ``_base_model`` owns the parameters and state dict; ``model`` is what we
-        # call forward through (a torch.compile wrapper shares the same params).
+        # ``_base_model`` owns the parameters and state dict (and stays unwrapped
+        # so checkpoints are provenance-clean); ``model`` is what we call forward
+        # through — a torch.compile and/or DDP wrapper sharing the same params.
         self._base_model = model
         # torch.compile returns an nn.Module at runtime but is typed as Callable.
-        self.model: torch.nn.Module = torch.compile(model) if config.compile else model  # type: ignore[assignment]
+        core: torch.nn.Module = torch.compile(model) if config.compile else model  # type: ignore[assignment]
+        self.model: torch.nn.Module = _wrap_distributed(core, config, self.dist)
 
         self.autocast_enabled, self.autocast_dtype, self.scaler_enabled = resolve_precision(
             config.amp, config.precision, self.device.type
@@ -195,6 +215,8 @@ class Trainer:
                         metrics.update(self._validate(val_loader))
                     last_metrics = metrics
                     self._dispatch_epoch_end(epoch, metrics)
+                # Agree on stopping across ranks so none deadlocks at the next collective.
+                self.should_stop = broadcast_flag(self.should_stop, self.dist)
                 if self.should_stop:
                     break
         finally:
@@ -221,8 +243,12 @@ class Trainer:
             ):
                 logits = self.adapter.forward(self.model, batch)
                 loss = self.task.loss(logits, labels) / self.config.grad_accum
-            self.scaler.scale(loss).backward()
-            if (step + 1) % self.config.grad_accum == 0:
+            is_update_step = (step + 1) % self.config.grad_accum == 0
+            # Under DDP, skip the gradient all-reduce on accumulation micro-steps;
+            # sync only on the step that actually applies the update.
+            with self._grad_sync_context(is_update_step):
+                self.scaler.scale(loss).backward()
+            if is_update_step:
                 self.scaler.unscale_(self.optimizer)
                 torch.nn.utils.clip_grad_norm_(self._trainable_params(), self.config.max_grad_norm)
                 self.scaler.step(self.optimizer)
@@ -248,6 +274,11 @@ class Trainer:
                 break
         return total / max(1, count)
 
+    def _grad_sync_context(self, is_update_step: bool) -> ContextManager:
+        if not is_update_step and isinstance(self.model, DistributedDataParallel):
+            return self.model.no_sync()
+        return nullcontext()
+
     def _dispatch_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
         for cb in self.callbacks:
             cb.on_epoch_end(self, epoch, metrics)
@@ -270,7 +301,11 @@ class Trainer:
         metrics = {"val_loss": float(np.mean(losses)) if losses else 0.0}
         if preds:
             metrics.update(self.task.epoch_metrics(np.concatenate(preds), np.concatenate(labels_all)))
-        return {f"val_{k}" if not k.startswith("val_") else k: v for k, v in metrics.items()}
+        named = {f"val_{k}" if not k.startswith("val_") else k: v for k, v in metrics.items()}
+        # Average across ranks so every rank sees identical metrics — this keeps
+        # metric-driven decisions (early stop, best-checkpoint) consistent without
+        # extra coordination. Each rank validates its own data shard.
+        return reduce_mean(named, self.dist)
 
     def state_dict(self) -> dict[str, object]:
         """The full training state needed to resume: weights, optimizer, schedule,
