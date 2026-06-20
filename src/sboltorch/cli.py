@@ -5,10 +5,13 @@ from __future__ import annotations
 import argparse
 import sys
 
-from sboltorch.config import RunConfig
+from sboltorch.config import RunConfig, TaskConfig
 from sboltorch.data.corpus import build_corpus
 from sboltorch.data.materialize import materialize
+from sboltorch.generate import generate_sequence
+from sboltorch.models import build_model
 from sboltorch.pipeline import run_training
+from sboltorch.tokenize.base import build_tokenizer
 
 
 def _cmd_ingest(args: argparse.Namespace) -> int:
@@ -27,6 +30,31 @@ def _cmd_train(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_generate(args: argparse.Namespace) -> int:
+    config = RunConfig.from_yaml(args.config)
+    tokenizer = build_tokenizer(config.tokenizer)
+    model = build_model(
+        config.model, TaskConfig(kind="causal"), vocab_size=tokenizer.vocab_size, pad_token_id=tokenizer.pad_token_id
+    )
+    model.eval()
+    for i in range(args.num_samples):
+        seed = None if args.seed is None else args.seed + i
+        print(
+            generate_sequence(
+                model,
+                tokenizer,
+                args.prompt,
+                max_new_tokens=args.max_new_tokens,
+                temperature=args.temperature,
+                top_k=args.top_k,
+                top_p=args.top_p,
+                max_context=config.model.arch.max_position_embeddings,
+                seed=seed,
+            )
+        )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sboltorch", description="Train transformer models on SBOL data")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -42,6 +70,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--resume", metavar="CKPT", default=None, help="Resume from a checkpoint (e.g. an output dir's last.pt)"
     )
     p_train.set_defaults(func=_cmd_train)
+
+    p_generate = sub.add_parser("generate", help="Generate sequences from a trained causal-LM backbone")
+    p_generate.add_argument("config", help="Path to a run config YAML (model.backbone points at the saved backbone)")
+    p_generate.add_argument("--prompt", default="", help="Seed sequence to continue (empty starts from scratch)")
+    p_generate.add_argument("--max-new-tokens", type=int, default=128)
+    p_generate.add_argument("--temperature", type=float, default=1.0, help="<=0 is greedy")
+    p_generate.add_argument("--top-k", type=int, default=0)
+    p_generate.add_argument("--top-p", type=float, default=1.0)
+    p_generate.add_argument("--num-samples", type=int, default=1)
+    p_generate.add_argument("--seed", type=int, default=None)
+    p_generate.set_defaults(func=_cmd_generate)
 
     return parser
 

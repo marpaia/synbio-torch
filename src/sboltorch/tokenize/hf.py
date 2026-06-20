@@ -57,3 +57,6 @@ class HFTokenizer:
             add_special_tokens=True,
         )
         return Encoded(input_ids=list(out["input_ids"]), attention_mask=list(out["attention_mask"]))
+
+    def decode(self, ids: list[int]) -> str:
+        return str(self._hf.decode(ids, skip_special_tokens=True))

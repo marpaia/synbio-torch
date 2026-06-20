@@ -32,12 +32,19 @@ All three produce batches consumed by one training engine through a
 | `frozen` | regression or classification head; backbone frozen | `val_mae`/`val_mse`/`val_r2` or `val_accuracy` | required |
 | `supervised` | same, fine-tuned end to end | same | required |
 | `mlm` | tied LM head; masked cross-entropy | `val_loss` (= masked CE), `val_masked_accuracy` | none (self-supervised) |
+| `causal` | decoder LM head; next-token cross-entropy | `val_loss` (perplexity = `exp(val_loss)`), `val_next_token_accuracy` | none (self-supervised) |
 
 - **Supervised regression** supports `target_transform: log1p` for expression/
   fitness-style targets; metrics are reported back in the original space.
 - **Classification** requires `task.num_classes`.
 - **MLM** masks ~`mlm_probability` of content tokens (80% `<mask>`, 10% random,
   10% unchanged), never masking special tokens.
+- **Causal** trains a decoder (e.g. `model.arch.model_type: gpt2`) on next-token
+  prediction. Pair it with `packing` to train on fixed-length blocks. After
+  training, the saved `backbone/` generates: `sboltorch generate <config>
+  --prompt <seq>` completes a design from a prefix (greedy with `--temperature 0`,
+  or sampled with `--temperature`/`--top-k`/`--top-p`). The same is available in
+  Python as `st.generate_sequence(model, tokenizer, prompt, max_new_tokens=...)`.
 
 ## Pretrain, then fine-tune
 

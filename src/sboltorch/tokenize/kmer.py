@@ -25,6 +25,7 @@ class KmerTokenizer:
         self._max_length = max_length
         kmers = ["".join(p) for p in product(_BASES, repeat=k)]
         self._vocab = {tok: i for i, tok in enumerate(_SPECIAL + kmers)}
+        self._id_to_tok = {i: tok for tok, i in self._vocab.items()}
         self._unk = self._vocab["<unk>"]
         self._special_ids = frozenset(self._vocab[tok] for tok in _SPECIAL)
 
@@ -59,3 +60,20 @@ class KmerTokenizer:
         content = self.tokenize_content(sequence)[: self._max_length - 2]
         ids = [self._vocab["<cls>"], *content, self._vocab["<sep>"]]
         return Encoded(input_ids=ids, attention_mask=[1] * len(ids))
+
+    def decode(self, ids: list[int]) -> str:
+        """Reconstruct the sequence from k-mer ids.
+
+        For the default stride of 1, adjacent k-mers overlap by ``k-1`` bases, so
+        the sequence is the first k-mer plus the last base of each subsequent one;
+        ``<unk>`` and special tokens are dropped. With a larger stride the overlap
+        is lost, so k-mers are concatenated (lossy).
+        """
+        toks = [
+            self._id_to_tok[i] for i in ids if i not in self._special_ids and self._id_to_tok.get(i, "<unk>") != "<unk>"
+        ]
+        if not toks:
+            return ""
+        if self.stride == 1:
+            return toks[0] + "".join(tok[-1] for tok in toks[1:])
+        return "".join(toks)

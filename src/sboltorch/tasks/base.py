@@ -46,4 +46,8 @@ def build_task(task_config: "object") -> Task:
         from .mlm import MlmTask
 
         return MlmTask()
+    if task_config.kind == "causal":
+        from .causal import CausalLMTask
+
+        return CausalLMTask()
     raise NotImplementedError(f"task kind '{task_config.kind}' is not implemented yet")

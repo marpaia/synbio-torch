@@ -13,6 +13,7 @@ from __future__ import annotations
 from sboltorch.config import RunConfig
 from sboltorch.data.corpus import build_corpus
 from sboltorch.data.materialize import materialize
+from sboltorch.generate import generate, generate_sequence
 from sboltorch.pipeline import prepare_data, run_training
 from sboltorch.types import Alphabet, Feature, SbolObject, SbolSequence
 
@@ -28,5 +29,7 @@ __all__ = [
     "prepare_data",
     "build_corpus",
     "materialize",
+    "generate",
+    "generate_sequence",
     "__version__",
 ]

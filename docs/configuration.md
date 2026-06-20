@@ -89,7 +89,7 @@ See [data.md](data.md) for the corpus sources in depth.
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
-| `kind` | `supervised` \| `frozen` \| `mlm` | `frozen` | `frozen` trains a head over a frozen backbone; `supervised` fine-tunes end to end; `mlm` is masked-language-model pretraining. |
+| `kind` | `supervised` \| `frozen` \| `mlm` \| `causal` | `frozen` | `frozen` trains a head over a frozen backbone; `supervised` fine-tunes end to end; `mlm` is masked-LM pretraining; `causal` is decoder next-token pretraining (set a decoder `model.arch.model_type`, e.g. `gpt2`). |
 | `objective` | `regression` \| `classification` | `regression` | Supervised head + loss. |
 | `num_classes` | int | `null` | **Required** for `classification`. |
 | `target_transform` | `none` \| `log1p` | `none` | `log1p` trains regression in log space and reports metrics in the original space. |
@@ -101,7 +101,7 @@ See [capabilities.md](capabilities.md) for how modality and objective combine.
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
-| `enabled` | bool | `false` | Concatenate tokenized documents into fixed-length blocks with no padding, so every position carries signal. The training unit becomes a block, not a document. Currently for `task.kind: mlm` and used with `streaming`. |
+| `enabled` | bool | `false` | Concatenate tokenized documents into fixed-length blocks with no padding, so every position carries signal. The training unit becomes a block, not a document. For `task.kind: mlm` or `causal`, used with `streaming`. |
 | `block_size` | int | `512` | Tokens per packed block. Must be ≤ `model.arch.max_position_embeddings`. |
 
 ## `splits`

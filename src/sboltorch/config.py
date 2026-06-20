@@ -93,7 +93,7 @@ class ModelConfig(BaseModel):
 
 
 class TaskConfig(BaseModel):
-    kind: Literal["supervised", "mlm", "frozen"] = "frozen"
+    kind: Literal["supervised", "mlm", "frozen", "causal"] = "frozen"
     objective: Literal["regression", "classification"] = "regression"
     num_classes: int | None = None
     target_transform: Literal["none", "log1p"] = "none"

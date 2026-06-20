@@ -44,6 +44,10 @@ class Tokenizer(Protocol):
 
     def encode(self, sequence: str) -> Encoded: ...
 
+    def decode(self, ids: list[int]) -> str:
+        """Reconstruct a sequence string from token ids, dropping special tokens."""
+        ...
+
 
 def build_tokenizer(config: "object") -> Tokenizer:  # noqa: ANN001 - avoid config import cycle
     """Construct the tokenizer named by ``config.kind``."""

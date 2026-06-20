@@ -17,6 +17,7 @@ from torch.utils.data import DataLoader
 from sboltorch.config import RunConfig
 from sboltorch.data.corpus import build_corpus
 from sboltorch.data.materialize import MaterializedCorpus, materialize
+from sboltorch.datasets.causal_collator import CausalCollator
 from sboltorch.datasets.dataset import Collator, EncodedDataset
 from sboltorch.datasets.mlm_collator import MlmCollator
 from sboltorch.datasets.packing import PackedDataset
@@ -34,6 +35,7 @@ from sboltorch.engine.callbacks import (
 from sboltorch.engine.trainer import Trainer
 from sboltorch.exceptions import ConfigError
 from sboltorch.models import build_model
+from sboltorch.models.causal import CausalLMModel
 from sboltorch.models.mlm import MaskedLMModel
 from sboltorch.reproducibility import set_seed
 from sboltorch.tasks.base import Task, build_task
@@ -87,17 +89,23 @@ def _loader(
     )
 
 
+def _collator_for(config: RunConfig, tokenizer: Any, task: Task) -> Callable[[list[Any]], Any]:
+    """Pick the collator for the objective: MLM masking, causal next-token shift,
+    or supervised padding+labels."""
+    if config.task.kind == "mlm":
+        return MlmCollator(tokenizer, mlm_probability=config.task.mlm_probability)
+    if config.task.kind == "causal":
+        return CausalCollator(tokenizer.pad_token_id)
+    return Collator(tokenizer.pad_token_id, with_labels=True, label_dtype=task.label_dtype)
+
+
 def _build_sequence_run(config: RunConfig, data: PreparedData, task: Task) -> tuple:
-    """Build (model, train_loader, val_loader, adapter) for the sequence/MLM path."""
+    """Build (model, train_loader, val_loader, adapter) for the sequence/MLM/causal path."""
     tokenizer = build_tokenizer(config.tokenizer)
     encoder = build_encoder(config.encoder, tokenizer)
     spec = encoder.output_spec
     model = build_model(config.model, config.task, vocab_size=spec.vocab_size, pad_token_id=spec.pad_token_id)
-    collator: Callable[[list[Any]], Any]
-    if config.task.kind == "mlm":
-        collator = MlmCollator(tokenizer, mlm_probability=config.task.mlm_probability)
-    else:
-        collator = Collator(tokenizer.pad_token_id, with_labels=True, label_dtype=task.label_dtype)
+    collator = _collator_for(config, tokenizer, task)
     train_loader = _loader(data.objects, data.split.train, encoder, collator, config, shuffle=True)
     val_loader = _loader(data.objects, data.split.val, encoder, collator, config, shuffle=False)
     return model, train_loader, val_loader, None
@@ -113,11 +121,11 @@ def _build_streaming_run(config: RunConfig, materialized: MaterializedCorpus, ta
     tokenizer = build_tokenizer(config.tokenizer)
     ratios = config.splits.ratios
     seed = config.seed
-    collator: Callable[[list[Any]], Any]
+    collator = _collator_for(config, tokenizer, task)
 
     if config.packing.enabled:
-        if config.task.kind != "mlm":
-            raise ConfigError("packing is currently supported only for task.kind: mlm")
+        if config.task.kind not in ("mlm", "causal"):
+            raise ConfigError("packing is supported only for task.kind: mlm or causal")
         model = build_model(
             config.model, config.task, vocab_size=tokenizer.vocab_size, pad_token_id=tokenizer.pad_token_id
         )
@@ -126,7 +134,6 @@ def _build_streaming_run(config: RunConfig, materialized: MaterializedCorpus, ta
             materialized, tokenizer, block_size=block, which="train", ratios=ratios, seed=seed
         )
         val_ds: object = PackedDataset(materialized, tokenizer, block_size=block, which="val", ratios=ratios, seed=seed)
-        collator = MlmCollator(tokenizer, mlm_probability=config.task.mlm_probability)
     else:
         encoder = build_encoder(config.encoder, tokenizer)
         spec = encoder.output_spec
@@ -137,10 +144,6 @@ def _build_streaming_run(config: RunConfig, materialized: MaterializedCorpus, ta
             materialized, encoder, which="train", ratios=ratios, seed=seed, shuffle_buffer=shuffle_buffer
         )
         val_ds = StreamingEncodedDataset(materialized, encoder, which="val", ratios=ratios, seed=seed)
-        if config.task.kind == "mlm":
-            collator = MlmCollator(tokenizer, mlm_probability=config.task.mlm_probability)
-        else:
-            collator = Collator(tokenizer.pad_token_id, with_labels=True, label_dtype=task.label_dtype)
 
     def loader(dataset: object) -> DataLoader:
         # IterableDataset forbids shuffle=True; shuffling is the dataset's job.
@@ -225,9 +228,9 @@ def run_training(config: RunConfig, *, resume_from: str | Path | None = None) ->
     metrics = trainer.fit(train_loader, val_loader, resume_from=resume_from)
     (output_dir / "final_metrics.json").write_text(json.dumps(metrics, indent=2))
 
-    # Write the pretrained model in HF format so a later supervised run can set
-    # `model.backbone` to this directory and load it as a plain encoder.
-    if isinstance(model, MaskedLMModel):
+    # Write the pretrained model in HF format so a later run (a supervised
+    # fine-tune, or generation for a causal LM) can point `model.backbone` here.
+    if isinstance(model, (MaskedLMModel, CausalLMModel)):
         backbone_dir = output_dir / "backbone"
         model.save_pretrained(backbone_dir)
 
