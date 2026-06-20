@@ -38,6 +38,26 @@ For local development on CPU/macOS, use a `from_scratch` model with the `kmer` o
 `char` tokenizer, or a small standard encoder; run bio-specific backbones like
 DNABERT-2 on a Linux/GPU host.
 
+## Long context & modern attention
+
+For long sequences, pick a RoPE architecture and SDPA attention in `model.arch`:
+
+| Goal | `model.arch` |
+|------|--------------|
+| Long-context causal pretraining | `model_type: gpt_neox` (or `llama`), large `max_position_embeddings` |
+| Long-context MLM | `model_type: modernbert` (RoPE encoder with local/global attention) |
+| Fused/fast attention | `attn_implementation: sdpa` (default) — FlashAttention kernels on CUDA, and works on CPU |
+
+RoPE architectures carry no absolute position-embedding table, so they run on
+sequences longer than `max_position_embeddings` (an absolute-position model like
+`bert`/`gpt2` is hard-capped at it). Pair a causal RoPE model with `packing` and
+`streaming` for block pretraining — see
+[`pretrain_causal_long.yaml`](../examples/configs/pretrain_causal_long.yaml).
+
+State-space / convolutional long-context models (e.g. Mamba, the Evo/Hyena route)
+are selectable via `model_type` when the architecture and its kernels are
+installed; they are not a bundled dependency.
+
 ## Structure-aware backbones
 
 The structure-aware encoder adds feature-boundary markers to the vocabulary, so

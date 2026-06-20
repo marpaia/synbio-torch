@@ -54,7 +54,7 @@ def build_model(
             model_config, vocab_size=vocab_size, pad_token_id=pad_token_id
         )
     else:
-        backbone, hidden_size = load_backbone(model_config.backbone)
+        backbone, hidden_size = load_backbone(model_config.backbone, model_config)
     head: nn.Module
     if task_config.objective == "classification":
         assert task_config.num_classes is not None  # enforced by TaskConfig validation

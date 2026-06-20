@@ -77,13 +77,18 @@ See [data.md](data.md) for the corpus sources in depth.
 
 ### `model.arch`
 
-| Field | Type | Default |
-|-------|------|---------|
-| `model_type` | str | `bert` |
-| `num_hidden_layers` | int | `6` |
-| `num_attention_heads` | int | `6` |
-| `intermediate_size` | int | `1536` |
-| `max_position_embeddings` | int | `1024` |
+Used when `model.from_scratch: true`. `model_type` selects any HuggingFace
+architecture — `bert`/`modernbert` for MLM, `gpt2`/`gpt_neox`/`llama` for causal.
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `model_type` | str | `bert` | HuggingFace architecture id. RoPE types (`modernbert`, `gpt_neox`, `llama`) extrapolate past `max_position_embeddings`; absolute-position types (`bert`, `gpt2`) are capped at it. |
+| `num_hidden_layers` | int | `6` | |
+| `num_attention_heads` | int | `6` | |
+| `intermediate_size` | int | `1536` | |
+| `max_position_embeddings` | int | `2048` | Context length. |
+| `attn_implementation` | `sdpa` \| `eager` \| `flash_attention_2` | `sdpa` | SDPA uses PyTorch's fused attention (FlashAttention kernels on CUDA) and works on CPU; `flash_attention_2` needs the flash-attn package + CUDA. |
+| `rope_theta` | float | `null` | Rotary base for RoPE architectures; `null` uses the architecture default. |
 
 ## `task`
 

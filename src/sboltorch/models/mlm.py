@@ -17,9 +17,10 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from transformers import AutoConfig, AutoModelForMaskedLM, PreTrainedModel
+from transformers import AutoModelForMaskedLM, PreTrainedModel
 
 from sboltorch.config import ModelConfig
+from sboltorch.models.backbone import attn_kwargs, from_scratch_config
 
 
 class MaskedLMModel(nn.Module):
@@ -36,18 +37,10 @@ class MaskedLMModel(nn.Module):
 
 def build_mlm_model(model_config: ModelConfig, *, vocab_size: int, pad_token_id: int) -> MaskedLMModel:
     if model_config.from_scratch:
-        arch = model_config.arch
-        config = AutoConfig.for_model(
-            arch.model_type,
-            vocab_size=vocab_size,
-            hidden_size=model_config.hidden_size,
-            num_hidden_layers=arch.num_hidden_layers,
-            num_attention_heads=arch.num_attention_heads,
-            intermediate_size=arch.intermediate_size,
-            max_position_embeddings=arch.max_position_embeddings,
-            pad_token_id=pad_token_id,
-        )
-        lm = AutoModelForMaskedLM.from_config(config)
+        config = from_scratch_config(model_config, vocab_size=vocab_size, pad_token_id=pad_token_id)
+        lm = AutoModelForMaskedLM.from_config(config, **attn_kwargs(model_config))
     else:
-        lm = AutoModelForMaskedLM.from_pretrained(model_config.backbone, trust_remote_code=True)
+        lm = AutoModelForMaskedLM.from_pretrained(
+            model_config.backbone, trust_remote_code=True, **attn_kwargs(model_config)
+        )
     return MaskedLMModel(lm)

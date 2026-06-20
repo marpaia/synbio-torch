@@ -71,13 +71,25 @@ class EncoderConfig(BaseModel):
 
 
 class ArchConfig(BaseModel):
-    """Architecture for a from-scratch encoder (used when ``model.from_scratch``)."""
+    """Architecture for a from-scratch model (used when ``model.from_scratch``).
+
+    ``model_type`` selects any HuggingFace architecture: ``bert``/``modernbert``
+    for MLM, ``gpt2``/``gpt_neox``/``llama`` for causal. RoPE-based types
+    (``modernbert``, ``gpt_neox``, ``llama``) extrapolate past
+    ``max_position_embeddings`` instead of failing, which is what makes long
+    context practical; ``rope_theta`` tunes their rotary base.
+    """
 
     model_type: str = "bert"
     num_hidden_layers: int = 6
     num_attention_heads: int = 6
     intermediate_size: int = 1536
-    max_position_embeddings: int = 1024
+    max_position_embeddings: int = 2048
+    # PyTorch SDPA dispatches to FlashAttention kernels on CUDA and works on CPU;
+    # ``flash_attention_2`` needs the flash-attn package + CUDA.
+    attn_implementation: Literal["eager", "sdpa", "flash_attention_2"] = "sdpa"
+    # Rotary base for RoPE architectures; None uses the architecture's default.
+    rope_theta: float | None = None
 
 
 class ModelConfig(BaseModel):

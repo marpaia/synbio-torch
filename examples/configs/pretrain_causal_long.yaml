@@ -1,0 +1,35 @@
+# Long-context causal pretraining: a RoPE decoder (gpt_neox) with SDPA attention
+# (FlashAttention kernels on CUDA), streaming a packed corpus under a step budget.
+seed: 42
+streaming: true
+output_dir: runs/pretrain_causal_long
+corpus:
+  source: synthetic
+  n: 2000
+tokenizer:
+  kind: kmer
+  k: 6
+  max_length: 2048
+model:
+  from_scratch: true
+  hidden_size: 512
+  arch:
+    model_type: gpt_neox
+    num_hidden_layers: 8
+    num_attention_heads: 8
+    intermediate_size: 2048
+    max_position_embeddings: 2048
+    attn_implementation: sdpa
+task:
+  kind: causal
+packing:
+  enabled: true
+  block_size: 2048
+splits:
+  strategy: hash
+train:
+  batch_size: 8
+  max_steps: 1000
+  precision: bf16
+  eval_every_n_steps: 200
+  checkpoint_every_n_steps: 200
