@@ -45,9 +45,18 @@ def env_rank_world() -> tuple[int, int]:
     return int(os.environ.get("RANK", "0")), int(os.environ.get("WORLD_SIZE", "1"))
 
 
+def select_device() -> torch.device:
+    """Pick the best available device: CUDA, then Apple MPS, then CPU."""
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
 def single_process_context(device: torch.device | None = None) -> DistContext:
     if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = select_device()
     return DistContext(rank=0, world_size=1, local_rank=0, backend="none", device=device)
 
 

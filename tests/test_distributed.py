@@ -37,6 +37,7 @@ from synbiotorch.distributed import (
     broadcast_flag,
     cleanup,
     reduce_mean,
+    select_device,
     setup_distributed,
     single_process_context,
     worker_shard,
@@ -96,6 +97,24 @@ def test_worker_shard_partitions_globally():
         if i % (world * num_workers) == worker_shard(r, world, w, num_workers)[0]
     ]
     assert sorted(assigned) == shards
+
+
+def test_select_device_prefers_accelerator():
+    device = select_device()
+    assert device.type in {"cuda", "mps", "cpu"}
+    if torch.cuda.is_available():
+        assert device.type == "cuda"
+    elif torch.backends.mps.is_available():
+        assert device.type == "mps"
+    else:
+        assert device.type == "cpu"
+
+
+def test_single_process_context_defaults_to_selected_device():
+    # A single-process run must land on the best available accelerator, not
+    # silently on CPU when one is present.
+    assert single_process_context().device == select_device()
+    assert single_process_context(CPU).device == CPU
 
 
 def test_single_process_helpers_are_noops():

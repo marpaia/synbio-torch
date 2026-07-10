@@ -50,14 +50,6 @@ class Callback:
         return None
 
 
-def select_device() -> torch.device:
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
-
-
 def resolve_precision(amp: bool, precision: str, device_type: str) -> tuple[bool, torch.dtype, bool]:
     """Resolve ``(autocast_enabled, autocast_dtype, scaler_enabled)`` for a run.
 
