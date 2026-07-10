@@ -1,0 +1,50 @@
+# Höllerer 2020 E. coli RBS -> translation-rate regression, fine-tuning a
+# pretrained DNABERT-2 backbone. The pretrained sibling of the from-scratch
+# cells: only the tokenizer/model block changes; corpus, task, and the fixed
+# column split are identical, so the held-out R^2 is directly comparable.
+# Prepare the corpus first: python examples/prepare_hollerer_rbs.py
+# On Apple MPS, DNABERT-2's remote code imports Triton; uninstall triton
+# (`uv pip uninstall triton`) so it takes the non-flash path.
+seed: 42
+output_dir: runs/hollerer_finetune_dnabert2
+
+corpus:
+  source: table
+  path: data/hollerer_rbs/hollerer_rbs.csv
+  sequence_column: sequence
+  label_column: label
+  id_column: id
+  alphabet: dna
+  cache_dir: .synbiotorch_cache
+
+tokenizer:
+  kind: hf
+  model_name: zhihan1996/DNABERT-2-117M
+  max_length: 32
+
+encoder:
+  kind: sequence
+
+model:
+  from_scratch: false
+  backbone: zhihan1996/DNABERT-2-117M
+  dropout: 0.1
+
+task:
+  kind: supervised
+  objective: regression
+
+splits:
+  strategy: column
+  column: split
+
+train:
+  batch_size: 64
+  epochs: 4
+  lr: 2.0e-5
+  weight_decay: 0.01
+  amp: false
+  early_stop:
+    monitor: val_mae
+    mode: min
+    patience: 2

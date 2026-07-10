@@ -1,0 +1,53 @@
+# Höllerer 2020 E. coli RBS -> translation-rate regression, from scratch with a
+# character tokenizer. One cell of the tokenizer x backbone sweep: swap only the
+# tokenizer/model block to reach the k-mer or pretrained-backbone variants.
+# Prepare the corpus first: python examples/prepare_hollerer_rbs.py
+# Compares against SAPIENs (Höllerer 2020): test R^2 0.9265 (ensemble) / 0.9148 (single).
+seed: 42
+output_dir: runs/hollerer_scratch_char
+
+corpus:
+  source: table
+  path: data/hollerer_rbs/hollerer_rbs.csv
+  sequence_column: sequence
+  label_column: label
+  id_column: id
+  alphabet: dna
+  cache_dir: .synbiotorch_cache
+
+tokenizer:
+  kind: char
+  alphabet: dna
+  max_length: 32
+
+encoder:
+  kind: sequence
+
+model:
+  from_scratch: true
+  hidden_size: 256
+  arch:
+    model_type: bert
+    num_hidden_layers: 4
+    num_attention_heads: 4
+    intermediate_size: 512
+    max_position_embeddings: 64
+
+task:
+  kind: supervised
+  objective: regression
+
+splits:
+  strategy: column
+  column: split
+
+train:
+  batch_size: 256
+  epochs: 20
+  lr: 1.0e-3
+  weight_decay: 0.01
+  amp: false
+  early_stop:
+    monitor: val_mae
+    mode: min
+    patience: 4

@@ -19,12 +19,19 @@ rust/target/
 # Local materialized corpora and run outputs
 .synbiotorch_cache/
 runs/
+runs_*.log
 *.parquet
 wandb/
 
 # Locally normalized/converted data
 examples/data/normalized/
 
+# Locally downloaded third-party datasets (not redistributed; see prepare scripts)
+data/
+
 # Environment
 .env
 .env.*
+
+# Private planning artifact (kept out of commits, like the sibling repos)
+PLAN.md
