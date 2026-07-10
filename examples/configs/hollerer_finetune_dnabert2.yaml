@@ -2,9 +2,10 @@
 # pretrained DNABERT-2 backbone. The pretrained sibling of the from-scratch
 # cells: only the tokenizer/model block changes; corpus, task, and the fixed
 # column split are identical, so the held-out R^2 is directly comparable.
-# Prepare the corpus first: python examples/prepare_hollerer_rbs.py
-# On Apple MPS, DNABERT-2's remote code imports Triton; uninstall triton
-# (`uv pip uninstall triton`) so it takes the non-flash path.
+# Prepare the corpus first:  python examples/prepare_hollerer_rbs.py
+# Prepare a Triton-free DNABERT-2 first (Apple Silicon / CPU):
+#   uv run --with huggingface_hub python examples/prepare_dnabert2.py
+# which populates data/dnabert2 (the backbone path below).
 seed: 42
 output_dir: runs/hollerer_finetune_dnabert2
 
@@ -19,7 +20,7 @@ corpus:
 
 tokenizer:
   kind: hf
-  model_name: zhihan1996/DNABERT-2-117M
+  model_name: data/dnabert2
   max_length: 32
 
 encoder:
@@ -27,7 +28,7 @@ encoder:
 
 model:
   from_scratch: false
-  backbone: zhihan1996/DNABERT-2-117M
+  backbone: data/dnabert2
   dropout: 0.1
 
 task:
