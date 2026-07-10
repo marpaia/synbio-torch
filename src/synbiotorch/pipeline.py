@@ -21,7 +21,7 @@ from synbiotorch.datasets.causal_collator import CausalCollator
 from synbiotorch.datasets.dataset import Collator, EncodedDataset
 from synbiotorch.datasets.mlm_collator import MlmCollator
 from synbiotorch.datasets.packing import PackedDataset
-from synbiotorch.datasets.splits import Split, make_split
+from synbiotorch.datasets.splits import Split, make_split, split_from_assignments
 from synbiotorch.datasets.streaming import StreamingEncodedDataset
 from synbiotorch.distributed import DistContext, barrier, cleanup, setup_distributed
 from synbiotorch.encoders.base import build_encoder
@@ -57,17 +57,20 @@ def prepare_data(config: RunConfig) -> PreparedData:
     materialized = materialize(corpus, config.corpus.cache_dir, shard_size=config.corpus.shard_size)
     objects = materialized.read_all()
 
-    supervised = config.task.kind in ("supervised", "frozen")
-    labels = [o.label for o in objects] if supervised and config.splits.strategy == "stratified" else None
-    if labels is not None and any(label is None for label in labels):
-        labels = None  # cannot stratify on partially-unlabeled data
-    split = make_split(
-        len(objects),
-        ratios=config.splits.ratios,
-        seed=config.seed,
-        labels=labels,  # type: ignore[arg-type]
-        strategy=config.splits.strategy,
-    )
+    if config.splits.strategy == "column":
+        split = split_from_assignments([o.raw.get(config.splits.column) for o in objects])
+    else:
+        supervised = config.task.kind in ("supervised", "frozen")
+        labels = [o.label for o in objects] if supervised and config.splits.strategy == "stratified" else None
+        if labels is not None and any(label is None for label in labels):
+            labels = None  # cannot stratify on partially-unlabeled data
+        split = make_split(
+            len(objects),
+            ratios=config.splits.ratios,
+            seed=config.seed,
+            labels=labels,  # type: ignore[arg-type]
+            strategy=config.splits.strategy,
+        )
     return PreparedData(corpus=materialized, objects=objects, split=split)
 
 

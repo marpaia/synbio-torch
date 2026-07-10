@@ -144,8 +144,13 @@ class SplitConfig(BaseModel):
     # ``hash`` assigns each record to a partition by hashing its IRI, so the split
     # needs no global index and is stable as the corpus grows — required for the
     # streaming path. ``random``/``stratified`` are the in-memory index splits.
-    strategy: Literal["random", "stratified", "hash"] = "random"
+    # ``column`` honors a partition the source already carries (a ``split`` field
+    # per record valued ``train``/``val``/``test``), for datasets that ship a
+    # fixed, published split; ``ratios`` are unused in that case.
+    strategy: Literal["random", "stratified", "hash", "column"] = "random"
     ratios: tuple[float, float, float] = (0.8, 0.1, 0.1)
+    # Raw-field key read when ``strategy == 'column'``.
+    column: str = "split"
 
     @model_validator(mode="after")
     def _check_ratios(self) -> "SplitConfig":

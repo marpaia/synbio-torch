@@ -9,10 +9,26 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
+from typing import Sequence
 
 import numpy as np
 
+from synbiotorch.exceptions import ConfigError
+
 _SPLIT_NAMES = ("train", "val", "test")
+
+# Accepted aliases for each canonical partition name in a ``column`` split.
+_SPLIT_ALIASES = {
+    "train": "train",
+    "training": "train",
+    "val": "val",
+    "valid": "val",
+    "validation": "val",
+    "dev": "val",
+    "test": "test",
+    "testing": "test",
+    "eval": "test",
+}
 
 
 @dataclass(frozen=True)
@@ -71,6 +87,28 @@ def make_split(
     rng.shuffle(indices)
     t, v, te = _partition(indices, ratios)
     return Split(tuple(sorted(t)), tuple(sorted(v)), tuple(sorted(te)))
+
+
+def split_from_assignments(assignments: Sequence[str | None]) -> Split:
+    """Build a :class:`Split` from an explicit per-record partition label.
+
+    Each entry names the record's partition (``train``/``val``/``test``, with the
+    aliases in :data:`_SPLIT_ALIASES`). This honors a fixed split a dataset ships
+    rather than recomputing one, so a held-out metric is comparable to a published
+    number over the identical test set.
+    """
+    buckets: dict[str, list[int]] = {name: [] for name in _SPLIT_NAMES}
+    for index, raw in enumerate(assignments):
+        if raw is None:
+            raise ConfigError(f"column split: record {index} has no split value")
+        key = _SPLIT_ALIASES.get(str(raw).strip().lower())
+        if key is None:
+            raise ConfigError(
+                f"column split: record {index} has unrecognized split value {raw!r} "
+                f"(expected one of {sorted(_SPLIT_ALIASES)})"
+            )
+        buckets[key].append(index)
+    return Split(tuple(buckets["train"]), tuple(buckets["val"]), tuple(buckets["test"]))
 
 
 def split_of(key: str, ratios: tuple[float, float, float] = (0.8, 0.1, 0.1), seed: int = 42) -> str:
