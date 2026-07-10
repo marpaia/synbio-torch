@@ -23,7 +23,7 @@ import torch
 from synbiotorch.config import RunConfig
 from synbiotorch.datasets.dataset import Collator, EncodedDataset
 from synbiotorch.encoders.base import build_encoder
-from synbiotorch.engine.trainer import select_device
+from synbiotorch.engine import select_device
 from synbiotorch.models import build_model
 from synbiotorch.pipeline import prepare_data
 from synbiotorch.tokenize.base import build_tokenizer
@@ -35,12 +35,26 @@ RUNS = {
 }
 
 
-def _metrics(y_true: torch.Tensor, y_pred: torch.Tensor) -> tuple[float, float]:
-    mae = (y_true - y_pred).abs().mean().item()
+def _r2(y_true: torch.Tensor, y_pred: torch.Tensor) -> float:
     ss_res = ((y_true - y_pred) ** 2).sum()
     ss_tot = ((y_true - y_true.mean()) ** 2).sum()
-    r2 = (1.0 - ss_res / ss_tot).item()
-    return r2, mae
+    return (1.0 - ss_res / ss_tot).item()
+
+
+def _metrics(y_true: torch.Tensor, y_pred: torch.Tensor) -> tuple[float, float]:
+    return _r2(y_true, y_pred), (y_true - y_pred).abs().mean().item()
+
+
+def _bootstrap_r2_ci(y_true: torch.Tensor, y_pred: torch.Tensor, n: int = 2000, seed: int = 0) -> tuple[float, float]:
+    """Percentile 95% CI for the test R^2 by resampling the test set with replacement."""
+    gen = torch.Generator().manual_seed(seed)
+    size = y_true.numel()
+    stats = torch.empty(n)
+    for i in range(n):
+        idx = torch.randint(0, size, (size,), generator=gen)
+        stats[i] = _r2(y_true[idx], y_pred[idx])
+    stats, _ = stats.sort()
+    return stats[int(0.025 * n)].item(), stats[int(0.975 * n)].item()
 
 
 @torch.no_grad()
@@ -78,8 +92,8 @@ def main() -> None:
 
     device = select_device()
     print(f"device: {device}\n")
-    print(f"{'configuration':<26}{'R^2':>10}{'MAE':>10}")
-    print("-" * 46)
+    print(f"{'configuration':<26}{'R^2':>10}{'MAE':>10}{'R^2 95% CI':>22}")
+    print("-" * 68)
 
     results = {}
     for label, path in RUNS.items():
@@ -89,8 +103,9 @@ def main() -> None:
             continue
         y_true, y_pred = evaluate(run_dir, device)
         r2, mae = _metrics(y_true, y_pred)
+        lo, hi = _bootstrap_r2_ci(y_true, y_pred)
         results[label] = (r2, mae, y_true, y_pred)
-        print(f"{label:<26}{r2:>10.4f}{mae:>10.4f}")
+        print(f"{label:<26}{r2:>10.4f}{mae:>10.4f}{f'[{lo:.4f}, {hi:.4f}]':>22}")
 
     if not results:
         return

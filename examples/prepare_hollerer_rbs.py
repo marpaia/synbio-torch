@@ -32,7 +32,12 @@ import numpy as np
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "hollerer_rbs"
 OUTPUT_CSV = DATA_DIR / "hollerer_rbs.csv"
-BASE_URL = "https://raw.githubusercontent.com/BorgwardtLab/SAPIENs/main/data"
+# Pinned to a commit rather than a moving branch so the corpus is reproducible.
+SAPIENS_COMMIT = "316a562e85379b03ba3bea8f5149391f59c581ed"
+BASE_URL = f"https://raw.githubusercontent.com/BorgwardtLab/SAPIENs/{SAPIENS_COMMIT}/data"
+# Expected array lengths (train/validation pool, held-out test); 303,503 total.
+EXPECTED_TRAIN_VAL = 275_849
+EXPECTED_TEST = 27_654
 ARRAYS = (
     "sequences_train_validation.npy",
     "targets_train_validation.npy",
@@ -65,6 +70,14 @@ def main() -> None:
     tgts_tv = _load("targets_train_validation.npy")
     seqs_test = _load("sequences_test.npy")
     tgts_test = _load("targets_test.npy")
+
+    # Guard against a silently-changed upstream: the pinned arrays must match the
+    # published partition sizes exactly.
+    if len(seqs_tv) != EXPECTED_TRAIN_VAL or len(seqs_test) != EXPECTED_TEST:
+        raise ValueError(
+            f"unexpected array sizes: train/val={len(seqs_tv)} (want {EXPECTED_TRAIN_VAL}), "
+            f"test={len(seqs_test)} (want {EXPECTED_TEST})"
+        )
 
     # Draw a fixed validation partition out of the combined train/validation pool.
     rng = np.random.default_rng(SEED)
