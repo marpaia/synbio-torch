@@ -45,6 +45,36 @@ synbiotorch ingest examples/configs/ingest_genbank.yaml
 Point `corpus.path` at a directory of `.gb`/`.gbk` (or `.ttl`/`.xml` for SBOL)
 files to build a real corpus; `corpus.namespace` roots the imported identities.
 
+## Höllerer RBS demonstration (paper Table 1)
+
+The configuration sweep on the Höllerer et al. *E. coli* RBS dataset. All three
+variants share one corpus, task, and the published held-out split; they differ
+only in the tokenizer and model blocks.
+
+```bash
+# 1. download the SAPIENs arrays (pinned commit) and build the split CSV
+python examples/prepare_hollerer_rbs.py
+# 2. build a Triton-free DNABERT-2 copy (needed on Apple Silicon / CPU)
+python examples/prepare_dnabert2.py
+# 3. train the three sweep variants
+synbiotorch train examples/configs/hollerer_scratch_char.yaml
+synbiotorch train examples/configs/hollerer_scratch_kmer.yaml
+synbiotorch train examples/configs/hollerer_finetune_dnabert2.yaml
+# 4. score on the fixed test split, archive metrics + predictions, write the figure
+env -u VIRTUAL_ENV uv run --with matplotlib python examples/eval_hollerer.py \
+    --out ../research/synbio-torch/figures/rbs_scatter.pdf
+```
+
+Step 4 scores each run on the exact SAPIENs test partition (`split == "test"`,
+27,654 variants) and writes:
+
+- [`hollerer_test_metrics.json`](hollerer_test_metrics.json) — the held-out test
+  R², MAE, and bootstrap CI for each variant (the source of the paper's Table 1),
+- `hollerer_predictions/<run>.npz` — per-variant measured and predicted values.
+
+These held-out **test** metrics are distinct from the **validation** metrics in
+each run's `runs/<run>/final_metrics.json`.
+
 ## Weights & Biases
 
 The two synthetic configs have `wandb.enabled: true`. Put `WANDB_API_KEY` in a

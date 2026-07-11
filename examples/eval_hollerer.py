@@ -3,21 +3,29 @@
 Loads each run's resolved config and best checkpoint, rebuilds the model,
 and scores it on the exact SAPIENs test partition (split == "test") so the
 coefficient of determination and mean absolute error are directly comparable
-to the published numbers. Prints a per-run table and, for the strongest run,
-writes a measured-vs-predicted scatter used as the paper's figure.
+to the published numbers. Prints a per-run table, archives the held-out test
+metrics and predictions, and, for the strongest run, writes a measured-vs-predicted
+scatter used as the paper's figure.
+
+The combined test summary (``examples/hollerer_test_metrics.json``) is the
+artifact the paper's Table 1 is read from; per-run predictions land in
+``examples/hollerer_predictions/``. These held-out test metrics are distinct
+from the ``final_metrics.json`` each run carries, which holds validation metrics.
 
 Run after the training runs finish (not concurrently, to avoid re-syncing the
 shared environment under a live run):
 
-    uv run --with matplotlib python examples/eval_hollerer.py \
+    env -u VIRTUAL_ENV uv run --with matplotlib python examples/eval_hollerer.py \
         --out ../research/synbio-torch/figures/rbs_scatter.pdf
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
+import numpy as np
 import torch
 
 from synbiotorch.config import RunConfig
@@ -85,10 +93,51 @@ def evaluate(run_dir: Path, device: torch.device) -> tuple[torch.Tensor, torch.T
     return torch.cat(trues), torch.cat(preds)
 
 
+def _archive(
+    run_dir: Path,
+    preds_dir: Path,
+    label: str,
+    r2: float,
+    mae: float,
+    ci: tuple[float, float],
+    y_true: torch.Tensor,
+    y_pred: torch.Tensor,
+) -> dict:
+    """Archive a run's held-out test metrics and predictions.
+
+    Predictions land in ``preds_dir`` (a tracked path) keyed by the run name; the
+    ``runs/`` tree itself holds the large checkpoints and is not committed.
+    """
+    preds_path = preds_dir / f"{run_dir.name}.npz"
+    record = {
+        "configuration": label,
+        "split": "test",
+        "n_test": int(y_true.numel()),
+        "test_r2": r2,
+        "test_mae": mae,
+        "test_r2_ci95": [ci[0], ci[1]],
+        "run": run_dir.name,
+        "checkpoint": "best.pt",
+        "config": "config.resolved.yaml",
+        "predictions": str(preds_path),
+    }
+    preds_dir.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(preds_path, y_true=y_true.numpy(), y_pred=y_pred.numpy())
+    return record
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default="rbs_scatter.pdf", help="scatter figure output path")
+    parser.add_argument(
+        "--metrics-out",
+        default="examples/hollerer_test_metrics.json",
+        help="combined held-out test summary the paper's Table 1 is read from",
+    )
     args = parser.parse_args()
+
+    metrics_out = Path(args.metrics_out)
+    preds_dir = metrics_out.parent / "hollerer_predictions"
 
     device = select_device()
     print(f"device: {device}\n")
@@ -96,6 +145,7 @@ def main() -> None:
     print("-" * 68)
 
     results = {}
+    summary = []
     for label, path in RUNS.items():
         run_dir = Path(path)
         if not (run_dir / "best.pt").exists():
@@ -105,10 +155,16 @@ def main() -> None:
         r2, mae = _metrics(y_true, y_pred)
         lo, hi = _bootstrap_r2_ci(y_true, y_pred)
         results[label] = (r2, mae, y_true, y_pred)
+        summary.append(_archive(run_dir, preds_dir, label, r2, mae, (lo, hi), y_true, y_pred))
         print(f"{label:<26}{r2:>10.4f}{mae:>10.4f}{f'[{lo:.4f}, {hi:.4f}]':>22}")
 
     if not results:
         return
+
+    metrics_out.parent.mkdir(parents=True, exist_ok=True)
+    metrics_out.write_text(json.dumps({"device": str(device), "runs": summary}, indent=2) + "\n")
+    print(f"\nwrote {metrics_out}")
+
     best = max(results, key=lambda k: results[k][0])
     r2, mae, y_true, y_pred = results[best]
     _scatter(y_true, y_pred, best, r2, Path(args.out))

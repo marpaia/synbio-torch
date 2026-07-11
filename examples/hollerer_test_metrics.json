@@ -1,0 +1,50 @@
+{
+  "device": "mps",
+  "runs": [
+    {
+      "configuration": "char (from scratch)",
+      "split": "test",
+      "n_test": 27654,
+      "test_r2": 0.905551016330719,
+      "test_mae": 0.04783201590180397,
+      "test_r2_ci95": [
+        0.8999991416931152,
+        0.9107674956321716
+      ],
+      "run": "hollerer_scratch_char",
+      "checkpoint": "best.pt",
+      "config": "config.resolved.yaml",
+      "predictions": "examples/hollerer_predictions/hollerer_scratch_char.npz"
+    },
+    {
+      "configuration": "k-mer (from scratch)",
+      "split": "test",
+      "n_test": 27654,
+      "test_r2": 0.9179614782333374,
+      "test_mae": 0.04287191480398178,
+      "test_r2_ci95": [
+        0.912618100643158,
+        0.9229645729064941
+      ],
+      "run": "hollerer_scratch_kmer",
+      "checkpoint": "best.pt",
+      "config": "config.resolved.yaml",
+      "predictions": "examples/hollerer_predictions/hollerer_scratch_kmer.npz"
+    },
+    {
+      "configuration": "DNABERT-2 (fine-tuned)",
+      "split": "test",
+      "n_test": 27654,
+      "test_r2": 0.8903798460960388,
+      "test_mae": 0.05397789925336838,
+      "test_r2_ci95": [
+        0.8848366141319275,
+        0.8958981037139893
+      ],
+      "run": "hollerer_finetune_dnabert2",
+      "checkpoint": "best.pt",
+      "config": "config.resolved.yaml",
+      "predictions": "examples/hollerer_predictions/hollerer_finetune_dnabert2.npz"
+    }
+  ]
+}
