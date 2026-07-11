@@ -115,7 +115,9 @@ def test_resume_reproduces_uninterrupted_run(tmp_path):
     assert resumed.start_epoch == 2
     assert resumed.global_step == full.global_step
     for name, tensor in expected.items():
-        torch.testing.assert_close(resumed._base_model.state_dict()[name], tensor, rtol=1e-5, atol=1e-6)
+        # Exact bit-for-bit equality: the deterministic CPU path restores RNG,
+        # optimizer, and scheduler state so resumption reproduces every weight.
+        torch.testing.assert_close(resumed._base_model.state_dict()[name], tensor, rtol=0, atol=0)
 
 
 def test_max_steps_ends_the_run(tmp_path):
