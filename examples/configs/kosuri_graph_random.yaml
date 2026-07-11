@@ -1,0 +1,38 @@
+# Kosuri promoter x RBS composability: graph transformer over the composition
+# graph. The construct becomes a graph of its parts (promoter, RBS) with shared
+# part identities across the library. Same corpus, task, and split as the other
+# cells; the encoder is graph and the backbone is a graph transformer.
+seed: 42
+output_dir: runs/kosuri_graph_random
+
+corpus:
+  source: sbol
+  path: data/kosuri/sbol
+  label_key: prot
+
+encoder:
+  kind: graph
+
+model:
+  hidden_size: 128
+  arch:
+    num_hidden_layers: 3
+    num_attention_heads: 4
+
+task:
+  kind: supervised
+  objective: regression
+
+splits:
+  strategy: column
+  column: split_random
+
+train:
+  batch_size: 128
+  epochs: 60
+  lr: 1.0e-3
+  amp: false
+  early_stop:
+    monitor: val_mae
+    mode: min
+    patience: 8

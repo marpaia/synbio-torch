@@ -75,6 +75,36 @@ Step 4 scores each run on the exact SAPIENs test partition (`split == "test"`,
 These held-out **test** metrics are distinct from the **validation** metrics in
 each run's `runs/<run>/final_metrics.json`.
 
+## Kosuri composability demonstration (design-native encoders)
+
+An encoder ablation on the Kosuri et al. 2013 promoter × RBS composability
+library, where each construct is a real composition of two annotated parts. The
+constructs are ingested as SBOL 3 through the native binding, and the same corpus,
+task, and split are held fixed while only the encoder varies — flat `sequence`,
+`structure_aware`, or `graph` — so the design-native modalities are exercised on
+real data. Two splits run for each encoder: `random` (in-distribution) and
+`partout`, a held-out-parts split whose test constructs use a promoter or RBS
+never seen in training, which measures generalization to novel part combinations.
+
+The three PNAS Supporting Information files are not open-access and are not
+redistributed. Download them once from
+[PMC3752251](https://pmc.ncbi.nlm.nih.gov/articles/PMC3752251/) (Supplementary
+Materials) into `data/kosuri/` (`sd01.xls`, `sd02.xls`, `sd03.xls`), then:
+
+```bash
+# 1. build the SBOL 3 corpus (log10 protein label + both split annotations)
+env -u VIRTUAL_ENV uv run --with pandas --with xlrd python examples/prepare_kosuri.py
+# 2. train the six-cell sweep (3 encoders x 2 splits)
+for enc in seq structure graph; do for split in random partout; do
+  synbiotorch train examples/configs/kosuri_${enc}_${split}.yaml
+done; done
+# 3. score each run on its test split, archive metrics + predictions
+env -u VIRTUAL_ENV uv run python examples/eval_kosuri.py
+```
+
+Step 3 writes [`kosuri_test_metrics.json`](kosuri_test_metrics.json) (test R²,
+MAE, and bootstrap CI per encoder × split) and `kosuri_predictions/<run>.npz`.
+
 ## Weights & Biases
 
 The two synthetic configs have `wandb.enabled: true`. Put `WANDB_API_KEY` in a

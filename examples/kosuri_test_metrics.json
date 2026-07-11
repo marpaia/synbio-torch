@@ -1,0 +1,84 @@
+{
+  "device": "mps",
+  "target": "log10(prot)",
+  "runs": [
+    {
+      "encoder": "flat sequence",
+      "encoder_key": "seq",
+      "split": "random",
+      "n_test": 1170,
+      "test_r2": 0.6828384399414062,
+      "test_mae": 0.3379475772380829,
+      "test_r2_ci95": [
+        0.6457735300064087,
+        0.7163753509521484
+      ],
+      "run": "kosuri_seq_random"
+    },
+    {
+      "encoder": "flat sequence",
+      "encoder_key": "seq",
+      "split": "partout",
+      "n_test": 2175,
+      "test_r2": 0.4284464716911316,
+      "test_mae": 0.45728105306625366,
+      "test_r2_ci95": [
+        0.38158345222473145,
+        0.4737508296966553
+      ],
+      "run": "kosuri_seq_partout"
+    },
+    {
+      "encoder": "structure-aware",
+      "encoder_key": "structure",
+      "split": "random",
+      "n_test": 1170,
+      "test_r2": 0.8117451667785645,
+      "test_mae": 0.2547614574432373,
+      "test_r2_ci95": [
+        0.7868654727935791,
+        0.8337546586990356
+      ],
+      "run": "kosuri_structure_random"
+    },
+    {
+      "encoder": "structure-aware",
+      "encoder_key": "structure",
+      "split": "partout",
+      "n_test": 2175,
+      "test_r2": 0.4484626054763794,
+      "test_mae": 0.423966646194458,
+      "test_r2_ci95": [
+        0.3934536576271057,
+        0.5001944303512573
+      ],
+      "run": "kosuri_structure_partout"
+    },
+    {
+      "encoder": "graph transformer",
+      "encoder_key": "graph",
+      "split": "random",
+      "n_test": 1170,
+      "test_r2": 0.7997164726257324,
+      "test_mae": 0.2484925389289856,
+      "test_r2_ci95": [
+        0.7659485936164856,
+        0.8284487128257751
+      ],
+      "run": "kosuri_graph_random"
+    },
+    {
+      "encoder": "graph transformer",
+      "encoder_key": "graph",
+      "split": "partout",
+      "n_test": 2175,
+      "test_r2": 0.2629798650741577,
+      "test_mae": 0.5622797608375549,
+      "test_r2_ci95": [
+        0.2189309000968933,
+        0.30446857213974
+      ],
+      "run": "kosuri_graph_partout"
+    }
+  ]
+}

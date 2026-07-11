@@ -55,6 +55,11 @@ def _record_to_design(record: dict[str, Any], label_key: str | None) -> Design:
     features = tuple(_feature(f) for f in record.get("features") or ())
     label = _label_from_extensions(record.get("extensions") or (), label_key) if label_key else None
     neighbors = _graph_from_record(record, features) if features or sequence else None
+    # Surface annotation values as raw fields keyed by local name, so raw-field
+    # consumers (the ``column`` split) read an SBOL annotation the same way they
+    # read a table column. Core record keys are never overwritten.
+    for ext in record.get("extensions") or ():
+        record.setdefault(local_name(ext["predicate"]), ext["value"])
     return Design(
         iri=record["iri"],
         record_class=record.get("record_class", ""),

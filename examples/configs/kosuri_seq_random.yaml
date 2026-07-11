@@ -1,0 +1,49 @@
+# Kosuri promoter x RBS composability: flat-sequence baseline.
+# The construct's promoter+RBS sequence is k-mer tokenized with no composition
+# information. Differs from the structure_aware and graph cells only in the
+# encoder (and, for those, the model) block; corpus, task, and split are shared.
+seed: 42
+output_dir: runs/kosuri_seq_random
+
+corpus:
+  source: sbol
+  path: data/kosuri/sbol
+  label_key: prot
+
+tokenizer:
+  kind: kmer
+  k: 3
+  stride: 1
+  max_length: 64
+
+encoder:
+  kind: sequence
+
+model:
+  from_scratch: true
+  hidden_size: 256
+  arch:
+    model_type: bert
+    num_hidden_layers: 4
+    num_attention_heads: 4
+    intermediate_size: 512
+    max_position_embeddings: 128
+
+task:
+  kind: supervised
+  objective: regression
+
+splits:
+  strategy: column
+  column: split_random
+
+train:
+  batch_size: 128
+  epochs: 40
+  lr: 1.0e-3
+  weight_decay: 0.01
+  amp: false
+  early_stop:
+    monitor: val_mae
+    mode: min
+    patience: 6
